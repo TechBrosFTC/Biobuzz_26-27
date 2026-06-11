@@ -41,7 +41,6 @@ public class Ateleop1 extends LinearOpMode {
     double curvapower = 0.4;
 
     String state = "parado";
-
     int index;
 
     //           D      FD      F      FE      E      TE      T      TD
@@ -221,6 +220,6 @@ public class Ateleop1 extends LinearOpMode {
 
     public double gyro() {
         return imu.getRobotYawPitchRollAngles()
-                .getYaw(AngleUnit.DEGREES);
+.getYaw(AngleUnit.DEGREES);
     }
 }
