@@ -152,7 +152,7 @@ public class Ateleop2 extends LinearOpMode {
     }
 
     private double calculateHeadingCorrection() {
-        headingError = normalizeAngle(targetHeading - getHeading());
+        headingError = normalizeAngle(getHeading() - targetHeading);
         integral = clamp(integral + headingError, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
 
         double derivative = headingError - lastHeadingError;

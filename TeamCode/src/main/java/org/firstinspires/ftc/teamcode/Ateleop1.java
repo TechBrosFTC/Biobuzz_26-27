@@ -219,7 +219,6 @@ public class Ateleop1 extends LinearOpMode {
     }
 
     public double gyro() {
-        return imu.getRobotYawPitchRollAngles()
-.getYaw(AngleUnit.DEGREES);
+        return imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
     }
 }
