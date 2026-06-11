@@ -174,7 +174,7 @@ public class Ateleop1 extends LinearOpMode {
 
     public double headingPID() {
 
-        erro = alvo - gyro();
+        erro = gyro() - alvo;
 
         proporcional = kp * erro;
 
