@@ -9,8 +9,8 @@ import com.qualcomm.robotcore.hardware.IMU;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 
-@TeleOp(name = "Ateleop1")
-public class Ateleop1 extends LinearOpMode {
+@TeleOp(name = "Ateleop2")
+public class Ateleop2 extends LinearOpMode {
 
     private static final double DRIVE_POWER = 0.8;
     private static final double MANUAL_TURN_POWER = 0.4;
