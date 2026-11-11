@@ -1,613 +1,474 @@
 package org.firstinspires.ftc.teamcode;
 
-import com.qualcomm.hardware.rev.RevBlinkinLedDriver;
+import com.acmerobotics.dashboard.config.Config;
+import com.acmerobotics.dashboard.FtcDashboard;
+import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
+import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
+import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.CRServo;
+import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
-import com.qualcomm.robotcore.hardware.DistanceSensor;
 import com.qualcomm.robotcore.hardware.IMU;
-import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.VoltageSensor;
+import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 
-import java.util.ArrayList;
 
-@TeleOp (name = "Ateleop1")
+
+
+@Config
+@TeleOp(name = "Ateleop1")
 public class Ateleop1 extends LinearOpMode {
+
+    // --- SENSORES E NAVEGAÇÃO / CHASSI ---
     private IMU imu;
+    private Limelight limelight;
     private DcMotorEx direitaFrente;
     private DcMotorEx direitaTras;
     private DcMotorEx esquerdaFrente;
     private DcMotorEx esquerdaTras;
-    private DcMotorEx viperDireita;
-    private DcMotorEx viperEsquerda;
-    private DcMotorEx odometriaX;
-    private DcMotorEx odometriaY;
-    private RevBlinkinLedDriver led;
-    private Servo servogarra;
-    private Servo servoViper;
-    private Servo servoExtensorDireita;
-    private Servo servoExtensorEsquerda;
-    double posicaoabrir = 0.8;
-    double posicaofechar = 0.5;
-    private DistanceSensor limitador;
-    private Servo servoGiro;
 
-    //imu horario = negativo antihorario = positivo
-    public int teste = 0;
-    double power = 1;
-    double powerx;
+    private Servo servoRampa;
+
+    // --- MOTORES DE MECANISMOS ---
+    private DcMotorEx shooter;
+    private DcMotorEx transfer;
+    private DcMotorEx intake;
+    private DcMotorEx passador;
+
+    private GoBildaPinpointDriver odo;
+
+    // --- SERVOS E TORRETA INSTANCIADA ---
+    private Servo servorampa;
+    private Servo servoPosicional;
+    private CRServo torreta;
+    private CRServo torreta1;
+    private DcMotorEx encoder_torreta;
+    private Turret turretObjeto;
+
+    private Servo hood;
+
+    // --- ALVO DE TRACKING DA TORRETA (60, 60 em Polegadas/MM) ---
+    public static double TARGET_X = 60.0;
+    public static double TARGET_Y = 60.0;
+
+    // --- CONFIGURAÇÕES DE TRANSFER E INTAKE ---
+    public static String TRANSFER_NAME = "transfer";
+    public static String INTAKE_NAME = "intake";
+    public static boolean REVERSE_INTAKE = false;
+
+    // --- GANHOS PIDF TUNÁVEIS NO FTC DASHBOARD ---
+    // Shooter PIDF
+    public static double SHOOTER_P = 80;
+    public static double SHOOTER_I = 0;
+
+    public static double SHOOTER_D = 0;
+    public static double SHOOTER_F = 13.4291;
+
+    // Transfer PIDF
+    public static double TRANSFER_P = 8;
+    public static double TRANSFER_I = 0.0;
+    public static double TRANSFER_D = 0.0;
+    public static double TRANSFER_F = 12.41;
+
+    // Passador PIDF
+    public static double PASSADOR_P = 5.0;
+    public static double PASSADOR_I = 0.0;
+    public static double PASSADOR_D = 0.0;
+    public static double PASSADOR_F = 12.0;
+
+    // --- POSIÇÕES AJUSTÁVEIS DO SERVO POSICIONAL ---
+    public static double POS_ABERTO = 1.0;
+    public static double POS_FECHADO = 0.0;
+
+    // --- CONTROLES DE BOTÃO E ESTADOS DA VARREDURA DA TORRETA ---
+    private boolean abriuServoRampa = false;
+    private boolean servoEstaAberto = false;
+    private boolean anteriorX = false;
+
+    private double searchDirection = -1.0;  // Sentido atual da busca da torreta entre os limites
+
+    // --- GANHOS DO PID DE HEADING DA BASE ---
+    double kp = 3;
+    double kd = 0;
+    double ki = 0;
+
     double erro;
     double proporcional;
-    double proximaposicao;
-    double derivativa;
-    double integral;
-    double direcao = 0;
-    double ultimoerro = 0;
-    double curvapower = 0.4;
+    double integral = 0;
+    double ultimoErro = 0;
     double alvo = 0;
-    double multiplicadorx = 1;
-    boolean curva = false;
-    double kp = 2.2; //5 Bom, 6 Legal-+
-    double kd = 2; // 35 Fica pouco, 40 Fica Pouco, 45 Quase lá
-    double ki = 0.0006;
-    double kpt = 3;
-    double kdt = 7;
-    double kit= 0.0006;
-    double kpxd = 8; //5 ruim, 6 ruim, 7 mais ou menos, 7.5 mais ou menos, 8 bom
-    double kdxd = 75; // 55 ruim, 65 mais ou menos, 70 bom
-    double kixd = 0.0082; // 0.0062 bom
-    double kpxe = 9; //5 ruim, 6 ruim, 7 mais ou menos, 7.5 mais ou menos, 8 mais ou menos
-    double kdxe = 88;  //55 ruim, 65 ruim, 70 ruim, 80 ruim, 85 mais ou menos
-    double kixe = 0.0082; // 0.0042 fica quase, 0.0062 bom
-    String state = "";
-    boolean extensor = false;
-    double lastpower = 0;
-    float f,t,d,e;
-    double multiplicador = 0.6;
-    double movetime = 0;
-    double currentpower = 0;
-    double fator = 0;
-    //////////////////////////////////////////////////////////////////Norte Abosluto/////////////////////////////////////////////////////////
-    double giroabsoluto;
-    int direcaoabsoluta;
-    int index;
-    float maior;
-    String direcaomovimento = "";
-    ///////////////////////////////////////////////////////////////////////
-    double joystick = 0;
-    double posicaoatualextensor = posicaofechar;
-    boolean modolento = false;
-    int numerodeciclos = 0;
-    double posicaoatualgarra = 0;
-    double proximaposicaogarra = 0;
-    boolean servosample = false;
-    boolean servoclip = false;
-    double viperPower;
-    double multiplicadorcurva = 1;
-    float[] stickmovimento = new float[4];
-    String dir = "";
-    boolean abrir = false;
-    @Override
 
+    double rx = 0;
+    double multiplicador = 0.65;
+    double curvapower = 0.5;
+
+    String state = "parado";
+    int index;
+    public static double incremento = 0;
+    double shot = 1;
+    double countshot = 1;
+    public static int shooterVelocity = 2815;
+    double shooterTicksPerRev = 28.0;
+    public static int velinicial = 2815;
+    public static double currentShooterRPM = 0;
+    boolean atirando = false;
+
+    // Direções discretas para translação
+    private static final double[][] DIRECTIONS = {
+            { 1,  0}, // direita
+            { 1,  1}, // frente-direita
+            { 0,  1}, // frente
+            {-1,  1}, // frente-esquerda
+            {-1,  0}, // esquerda
+            {-1, -1}, // trás-esquerda
+            { 0, -1}, // trás
+            { 1, -1}  // trás-direita
+    };
+
+    @Override
     public void runOpMode() throws InterruptedException {
+        telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
+
+        ElapsedTime timer = new ElapsedTime();
+        // Inicialização do IMU
         imu = hardwareMap.get(IMU.class, "imu");
+        RevHubOrientationOnRobot orientation =
+                new RevHubOrientationOnRobot(
+                        RevHubOrientationOnRobot.LogoFacingDirection.RIGHT,
+                        RevHubOrientationOnRobot.UsbFacingDirection.UP);
+        imu.initialize(new IMU.Parameters(orientation));
+
+        hood = hardwareMap.get(Servo.class, "hood");
+
+        passador = hardwareMap.get(DcMotorEx.class, "passador");
+        passador.setDirection(DcMotorSimple.Direction.FORWARD);
+        passador.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        passador.setVelocityPIDFCoefficients(PASSADOR_P, PASSADOR_I, PASSADOR_D, PASSADOR_F);
+
+        // Mapeamento dos motores do Chassi
         direitaFrente = hardwareMap.get(DcMotorEx.class, "rightFront");
         direitaTras = hardwareMap.get(DcMotorEx.class, "rightBack");
         esquerdaFrente = hardwareMap.get(DcMotorEx.class, "leftFront");
         esquerdaTras = hardwareMap.get(DcMotorEx.class, "leftBack");
-        viperDireita = hardwareMap.get(DcMotorEx.class, "viperDireita");
-        viperEsquerda = hardwareMap.get(DcMotorEx.class, "viperEsquerda");
-        servogarra = hardwareMap.get(Servo.class, "servoGarra");
-        led = hardwareMap.get(RevBlinkinLedDriver.class, "blinkin");
-        servoViper = hardwareMap.get(Servo.class, "servoViper");
-        servoExtensorDireita = hardwareMap.get(Servo.class, "servoDireita");
-        servoExtensorEsquerda = hardwareMap.get(Servo.class, "servoEsquerda");
-        servoExtensorEsquerda.setDirection(Servo.Direction.REVERSE);
-        servoExtensor(posicaofechar);
-        servoGiro = hardwareMap.get(Servo.class, "servoGiro");
-        odometriaX = hardwareMap.get(DcMotorEx.class, "perp");
-        odometriaY = hardwareMap.get(DcMotorEx.class, "par");
-        limitador = hardwareMap.get(DistanceSensor.class, "limitador");
-        viperDireita.setDirection(DcMotorSimple.Direction.REVERSE);
-        RevHubOrientationOnRobot revOrientaion = new RevHubOrientationOnRobot(RevHubOrientationOnRobot.LogoFacingDirection.UP, RevHubOrientationOnRobot.UsbFacingDirection.LEFT);
-        imu.initialize(new IMU.Parameters(revOrientaion));
-        direitaFrente.setDirection(DcMotorSimple.Direction.REVERSE);
-        direitaTras.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        direitaFrente.setDirection(DcMotorSimple.Direction.FORWARD);
+        direitaTras.setDirection(DcMotorSimple.Direction.FORWARD);
         esquerdaTras.setDirection(DcMotorSimple.Direction.REVERSE);
-        esquerdaFrente.setDirection(DcMotorSimple.Direction.REVERSE);
-        odometriaY.setDirection(DcMotorSimple.Direction.REVERSE);
-        odometriaX.setDirection(DcMotorSimple.Direction.REVERSE);
-        imu.resetYaw();
-        Thread garra = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                while (opModeIsActive()){
-                    if (gamepad2.right_trigger > 0 && limitador.getDistance(DistanceUnit.CM) < 43) {//subir viper
-                        viperPower = gamepad2.right_trigger;
-                        viperDireita.setPower(viperPower);
-                        viperEsquerda.setPower(viperPower);
-                    } else if (gamepad2.left_trigger > 0 && limitador.getDistance(DistanceUnit.CM) > 7) {//descer viper
-                        viperPower = -1*gamepad2.left_trigger;
-                        viperDireita.setPower(viperPower);
-                        viperEsquerda.setPower(viperPower);
-                    } else {//parar viper
-                        viperDireita.setPower(0);
-                        viperEsquerda.setPower(0);
-                    }
-                    if (gamepad2.circle) {//abre e fecha o servo do viper
-                        if (!servoclip) {//abre
-                            servoViper.setPosition(0);
-                            servoclip = true;
-                            sleep(300);
-                        } else {//fecha
-                            servoViper.setPosition(1);
-                            servoclip = false;
-                            sleep(300);
-                        }
-                    }
-                    if (gamepad2.square) {//abrir garra)
-                        if(!abrir){
-                            servoExtensor(posicaoabrir);
-                            sleep(300);
-                            servoGiro.setPosition(0.75);
-                            sleep(300);
-                            posicaoatualextensor = posicaoabrir;
-                            posicaoatualgarra = 0.6;
-                            abrir = true;
-                        }else{
-                            servogarra.setPosition(0);
-                            sleep(300);
-                            servoGiro.setPosition(0.2);
-                            sleep(300);
-                            servoExtensor(posicaofechar);
-                            sleep(300);
-                            posicaoatualextensor = posicaofechar;
-                            posicaoatualgarra = 0.2;
-                            abrir = false;
-                        }
-                    }
+        esquerdaFrente.setDirection(DcMotorSimple.Direction.FORWARD);
 
-                    if (gamepad2.triangle) {//fechar extensor
-                        extensor = false;
-                        servoGiro.setPosition(1);
-                        sleep(400);
-                        servogarra.setPosition(1);
-                        sleep(300);
-                        servoGiro.setPosition(0);
-                        sleep(900);
-                        servoExtensor(posicaofechar);
-                        sleep(300); //300
-                        posicaoatualextensor = posicaofechar; //posicaofechar
-                        posicaoatualgarra = 0.2;
-                    }
-                    if (gamepad2.cross) {//pegar e soltar sample
-                        if (!servosample) {//pegar
-                            servogarra.setPosition(1);
-                            sleep(300);
-                            servosample = true;
-                        } else {//soltar
-                            servogarra.setPosition(0);
-                            sleep(300);
-                            servosample = false;
-                        }
-                    }
+        // Mapeamento e Inicialização dos motores do Teste Shooter
+        shooter = hardwareMap.get(DcMotorEx.class, "shooter");
+        shooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        shooter.setVelocityPIDFCoefficients(SHOOTER_P, SHOOTER_I, SHOOTER_D, SHOOTER_F);
+        shooter.setDirection(DcMotorSimple.Direction.FORWARD);
 
-                    if (gamepad2.left_stick_y < 0 && !gamepad2.triangle) {//abre o extensor da garra
-                        if (posicaoatualextensor < posicaoabrir) {
-                            proximaposicao = posicaoatualextensor + (0.002 * Math.abs(gamepad2.left_stick_y));
-                            servoExtensor(proximaposicao);
-                            posicaoatualextensor = proximaposicao;
-                            extensor = true;
-                        }
-                    } else if (gamepad2.left_stick_y > 0 && !gamepad2.triangle) {//fecha o extensor da garra
-                        if (posicaoatualextensor > posicaofechar) {
-                            proximaposicao = posicaoatualextensor - (0.002 * Math.abs(gamepad2.left_stick_y));
-                            servoExtensor(proximaposicao);
-                            posicaoatualextensor = proximaposicao;
-                            extensor = true;
-                        }
-                    }
-                    if (gamepad2.right_stick_x < 0) {//gira a garra pra baixo
-                        if (posicaoatualgarra < 1) {
-                            proximaposicaogarra = posicaoatualgarra + (0.008 * Math.abs(gamepad2.right_stick_x));
-                            servoGiro.setPosition(proximaposicaogarra);
-                            posicaoatualgarra = proximaposicaogarra;
-                        }
-                    } else if (gamepad2.right_stick_x > 0) {//gira a garra pra cima
-                        if (posicaoatualgarra > 0.2) {
-                            proximaposicaogarra = posicaoatualgarra - (0.008 * Math.abs(gamepad2.right_stick_x));
-                            servoGiro.setPosition(proximaposicaogarra);
-                            posicaoatualgarra = proximaposicaogarra;
-                        }
-                    }
+        // Mapeamento de Transfer e Intake
+        transfer = hardwareMap.get(DcMotorEx.class, TRANSFER_NAME);
+        transfer.setDirection(DcMotorSimple.Direction.REVERSE);
+        transfer.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        transfer.setVelocityPIDFCoefficients(TRANSFER_P, TRANSFER_I, TRANSFER_D, TRANSFER_F);
+
+        intake = hardwareMap.get(DcMotorEx.class, INTAKE_NAME);
+        intake.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        servorampa = hardwareMap.get(Servo.class, "servorampa");
+
+        // --- INSTANCIAÇÃO DA CLASSE TURRET (SERVOS TORRETA E TORRETA1) ---
+        torreta = hardwareMap.get(CRServo.class, "torreta");
+        torreta1 = hardwareMap.get(CRServo.class, "torreta1");
+
+        torreta1.setDirection(DcMotorSimple.Direction.REVERSE);
+        torreta.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        encoder_torreta = hardwareMap.get(DcMotorEx.class, "leftFront");
+
+        double ticksPerDegreeTurret = 8192.0 / 36;
+        turretObjeto = new Turret(torreta, torreta1, encoder_torreta, ticksPerDegreeTurret, DcMotorSimple.Direction.REVERSE);
+        VoltageSensor voltagem;
+        /*
+         * Hardware do Pinpoint
+         */
+        odo = hardwareMap.get(GoBildaPinpointDriver.class, "pinpoint");
+        odo.setEncoderResolution(76.964, DistanceUnit.MM);
+        odo.setOffsets(-130, -55, DistanceUnit.MM);
+        odo.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.REVERSED, GoBildaPinpointDriver.EncoderDirection.REVERSED);
+        voltagem = hardwareMap.voltageSensor.iterator().next();
+        // Inicializa o Pinpoint na Posição Inicial (10, 10, Heading 0)
+        odo.initialize();
+        odo.setPosition(new Pose2D(DistanceUnit.INCH, 10.0, 10.0, AngleUnit.DEGREES, 0.0));
+
+        telemetry.addData("Status", "Inicializado com sucesso!");
+        telemetry.update();
+
+        limelight = new Limelight(hardwareMap);
+
+        DriveTrain driveTrain = new DriveTrain(hardwareMap);
+
+        double fator = 0.1;
+        double kpLimelight = 0.2;
+        telemetry.setMsTransmissionInterval(11);
+
+        boolean passando = false;
+        servorampa.setPosition(1);
+
+        // =========================================================================
+        // SINTONIA DO FEEDFORWARD (F) DO SHOOTER APÓS INIT E ANTES DE START
+        // =========================================================================
+        while (!isStarted() && !isStopRequested()) {
+
+            if (gamepad1.b) {
+                telemetry.addLine("=== CALIBRAÇÃO DO FEEDFORWARD (F) DO SHOOTER ===");
+                telemetry.addLine("Acelerando o motor do Shooter a 100% para medir velocidade máxima...");
+                telemetry.update();
+
+                shooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                shooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+                shooter.setPower(1.0);
+
+                ElapsedTime calibTimer = new ElapsedTime();
+                calibTimer.reset();
+
+                // Aguarda 500ms para vencer a inércia
+                while (!isStarted() && !isStopRequested() && calibTimer.milliseconds() < 500) {
+                    sleep(10);
                 }
-            }
-        });
-        Thread telemetria = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                while (opModeIsActive()) {
-/////////////////////////////////////////////////////Telemetria/////////////////////////////////////////////////////////////////////
-                    telemetry.addData("giro", gyro());
-                    telemetry.addData("direcao:", direcao);
-                    telemetry.addData("controle y:", gamepad1.left_stick_y);
-                    telemetry.addData("controle x:", gamepad1.left_stick_x);
-                    telemetry.addData("power:", power);
-                    telemetry.addData("index:", index);
-                    telemetry.addData("Direção", dir);
-                    telemetry.addData("concatenado", direcaomovimento);
-                    telemetry.addData("giro absoluto:", giroabsoluto);
-                    telemetry.addData("posicao abosluta:", direcaoabsoluta);
-                    telemetry.addData("modolento", modolento);
-                    telemetry.addData("posicao atual:", posicaoatualgarra);
-                    telemetry.addData("proxima posicao", proximaposicaogarra);
-                    telemetry.addData("servo:", servoViper.getPosition());
-                    telemetry.addData("state", state);
-                    telemetry.addData("odometriaX:", odometriaX.getCurrentPosition());
-                    telemetry.addData("odometriaY:", odometriaY.getCurrentPosition());
+
+                // Amostra a velocidade por 3 segundos para encontrar o valor máximo
+                double maxVelTicks = 0.0;
+                calibTimer.reset();
+                while (!isStarted() && !isStopRequested() && calibTimer.seconds() < 3.0) {
+                    double currentVel = Math.abs(shooter.getVelocity());
+                    if (currentVel > maxVelTicks) {
+                        maxVelTicks = currentVel;
+                    }
+                    double currentRPM = (currentVel * 60.0) / shooterTicksPerRev;
+                    telemetry.addData("Calibrando Shooter - RPM Atual", "%.2f RPM", currentRPM);
+                    telemetry.addData("Calibrando Shooter - Ticks/s Atual", "%.2f", currentVel);
                     telemetry.update();
+                    sleep(20);
+                }
 
-                }
-            }
-        });
-        led.setPattern(RevBlinkinLedDriver.BlinkinPattern.AQUA);
-        resetarEncoderOdometriasXY();
-        waitForStart();
-        imu.resetYaw();
-        giroabsoluto = 0;
-        int movimento;
-        int rotacao = 0;
+                shooter.setPower(0.0);
 
-        garra.start();
-        telemetria.start();
-        while (opModeIsActive()) {
+                // Fórmula da Documentação REV / FTC: F = 32767 / maxVelocityInTicksPerSecond
+                if (maxVelTicks > 0) {
+                    SHOOTER_F = 32767.0 / maxVelTicks;
+                }
+                double maxRPMCalculado = (maxVelTicks * 60.0) / shooterTicksPerRev;
 
-            if (gamepad1.left_stick_y != 0) {
-                if (gamepad1.left_stick_y > 0) {
-                    f = 0;
-                    t = Math.abs(gamepad1.left_stick_y);
-                } else {
-                    f = Math.abs(gamepad1.left_stick_y);
-                    t = 0;
-                }
-            } else {
-                f = 0;
-                t = 0;
-            }
-            if (gamepad1.left_stick_x != 0) {
-                if (gamepad1.left_stick_x > 0) {
-                    e = 0;
-                    d = Math.abs(gamepad1.left_stick_x);
-                } else {
-                    e = Math.abs(gamepad1.left_stick_x);
-                    d = 0;
-                }
-            } else {
-                d = 0;
-                e = 0;
-            }
-
-            if (f > t && f > d && f > e) { //andar para frente
-                dir = "Frente";
-                if (state.equals("parado")) {
-                    imu.resetYaw();
-                }
-                //numdir = 1;
-                erro = alvo - gyro();
-                proporcional = erro * kp;
-                derivativa = (erro - ultimoerro) * kd;
-                integral = erro + ki;
-                direcao = (proporcional + derivativa + integral) / 100;
-                movDirecionado(Math.abs(gamepad1.left_stick_y) * multiplicador, direcao);
-                ultimoerro = erro;
-                state = "andando";
-                /*movetime = System.currentTimeMillis();
-                numerodeciclos = 0;*/
-            }
-
-            if (t > f && t > d && t > e) { //andar para trás
-                if (state.equals("parado")) {
-                    imu.resetYaw();
-                }
-                erro = alvo - gyro();
-                proporcional = erro * kp;
-                derivativa = (erro - ultimoerro) * kd;
-                integral = erro + ki;
-                direcao = (proporcional + derivativa + integral) / 100;
-                lastpower = gamepad1.left_stick_y * multiplicador;
-                movDirecionado(Math.abs(gamepad1.left_stick_y) * multiplicador * -1, direcao);
-                ultimoerro = erro;
-                state = "andando";
-                /*movetime = System.currentTimeMillis();
-                numerodeciclos = 0;*/
-            }
-
-            if (d > f && d > t && d > e) { //andar para Direita
-                if (state.equals("parado")) {
-                    imu.resetYaw();
-                }
-                erro = alvo - gyro() ;
-                proporcional = erro * 1;
-                derivativa = (erro - ultimoerro) * 1;
-                integral = erro + ki;
-                direcao = (proporcional + derivativa + integral) / 100;
-                mecanumdireitabase(Math.abs(gamepad1.left_stick_x), -direcao);
-                state = "andando";
-                /*movetime = System.currentTimeMillis();
-                numerodeciclos = 0;*/
-            }
-            if (e > f && e > t && e > d) { //andar para Esquerda
-                if (state.equals("parado")) {
-                    imu.resetYaw();
-                }
-                if (state.equals("parado")) {
-                    imu.resetYaw();
-                }
-                erro = alvo - gyro() ;
-                proporcional = erro * 1;
-                derivativa = (erro - ultimoerro) * 1;
-                integral = erro + ki;
-                direcao = (proporcional + derivativa + integral) / 100;
-                mecanumesquerdabase(Math.abs(gamepad1.left_stick_x), direcao);
-                state = "andando";
-                /*movetime = System.currentTimeMillis();
-                numerodeciclos = 0;*/
-            }
-            if (f == 0 && t == 0 && d == 0 && e == 0) {
-                parar();
-                state = "parado";
-            }
-            if (gamepad1.right_stick_x > 0) {
-                direitaFrente.setPower(curvapower * multiplicadorcurva * -1);
-                direitaTras.setPower(curvapower * multiplicadorcurva * -1);
-                esquerdaFrente.setPower(curvapower * multiplicadorcurva);
-                esquerdaTras.setPower(curvapower * multiplicadorcurva);
-                curva = true;
-            } else if (gamepad1.right_stick_x < 0) {
-                direitaFrente.setPower(curvapower * multiplicadorcurva);
-                direitaTras.setPower(curvapower * multiplicadorcurva);
-                esquerdaFrente.setPower(curvapower * -1 * multiplicadorcurva);
-                esquerdaTras.setPower(curvapower * -1 * multiplicadorcurva);
-                curva = true;
-            } else {
-                if (curva) {
-                    parar();
+                while (!isStarted() && !isStopRequested() && !gamepad1.a) {
+                    telemetry.addLine("=== CALIBRAÇÃO DE F DO SHOOTER CONCLUÍDA ===");
+                    telemetry.addData("Shooter Max RPM Medido", "%.2f RPM", maxRPMCalculado);
+                    telemetry.addData("Shooter Max Ticks/s", "%.2f", maxVelTicks);
+                    telemetry.addData("SHOOTER_F Calculado (32767 / MaxTicks)", "%.4f", SHOOTER_F);
+                    telemetry.addLine("");
+                    telemetry.addLine("--> Espere o motor parar e PRESSIONE 'A' PARA CONFIRMAR <--");
+                    telemetry.update();
                     sleep(50);
-                    imu.resetYaw();
-                    curva = false;
-                    state = "parado";
                 }
             }
-            if(gamepad1.square){
-                if(gyro() > 0){
-                    double a = Math.abs((0.2-0.01)/gyro());
-                    double b = 0.2;
-                    while (gyro() > 0){
-                        direitaFrente.setPower((a*gyro()+b) * -1);
-                        direitaTras.setPower((a*gyro()+b) * -1);
-                        esquerdaFrente.setPower((a*gyro()+b) );
-                        esquerdaTras.setPower((a*gyro()+b) );
-                    }
-                    parar();
-                }else{
-                    while (gyro() < 0){
-                        double a = Math.abs((0.2-0.01)/Math.abs(gyro()));
-                        double b = 0.2;
-                        direitaFrente.setPower((a*Math.abs(gyro())+b));
-                        direitaTras.setPower((a*Math.abs(gyro())+b));
-                        esquerdaFrente.setPower((a*Math.abs(gyro())+b)*-1 );
-                        esquerdaTras.setPower((a*Math.abs(gyro())+b)*-1);
-                    }
-                    parar();
-                }
-                if(odometriaY.getCurrentPosition()>0){
-                    double a = (0.2-0.01)/Math.abs(odometriaY.getCurrentPosition());
-                    double b = 0.2;
-                    while (odometriaY.getCurrentPosition() > 0){
-                        erro = alvo - gyro();
-                        proporcional = erro * kp;
-                        derivativa = (erro - ultimoerro) * kd;
-                        integral = erro + ki;
-                        direcao = (proporcional + derivativa + integral) / 100;
-                        lastpower = gamepad1.left_stick_y * multiplicador;
-                        movDirecionado((a*Math.abs(odometriaY.getCurrentPosition())+b)*-1, direcao);
-                        ultimoerro = erro;
-                        state = "andando";
 
-                    }
-                    parar();
-                }else{
-                    while (odometriaY.getCurrentPosition() < 0){
-                        double a = (0.2-0.01)/Math.abs(odometriaY.getCurrentPosition());
-                        double b = 0.2;
-                        while (odometriaY.getCurrentPosition() > 0){
-                            erro = alvo - gyro();
-                            proporcional = erro * kp;
-                            derivativa = (erro - ultimoerro) * kd;
-                            integral = erro + ki;
-                            direcao = (proporcional + derivativa + integral) / 100;
-                            lastpower = gamepad1.left_stick_y * multiplicador;
-                            movDirecionado((a*Math.abs(odometriaY.getCurrentPosition())+b), direcao);
-                            ultimoerro = erro;
-                            state = "andando";
+            telemetry.addData("Status", "Inicializado! Aguardando Start...");
+            telemetry.addData("SHOOTER_F Configurado", "%.4f", SHOOTER_F);
+            telemetry.addLine("Dica: Pressione 'B' no Gamepad 1 para calibrar o F do Shooter.");
+            telemetry.update();
+            sleep(50);
+        }
 
-                        }
+        waitForStart();
 
-                    }
-                }
-                if(odometriaX.getCurrentPosition() > 0){
-                    while (odometriaX.getCurrentPosition() > 0){
-                        mecanumDirecionado(0.4, 0);
-                        state = "andando";
-                    }
-                    parar();
-                }else{
-                    while (odometriaX.getCurrentPosition() < 0){
-                        mecanumDirecionado(-0.4, 0);
-                        state = "andando";
-                    }
-                    parar();
-                }
-            }
-            if(gamepad1.cross){
-                multiplicadorx = 0.5;
-                multiplicador = 0.5;
-                multiplicadorcurva = 0.5;
-                modolento = true;
-                sleep(100);
-            }else{
-                multiplicadorx = 1;
-                multiplicador = 0.8;
-                multiplicadorcurva = 1;
-                modolento = false;
-                sleep(100);
-            }
-        }
-    }
-    /////////////////////////////////////////////////////funções///////////////////////////////////////////////////////////////////////
-    public void norteAbosluto(){
-        if (giroabsoluto >= 315 || giroabsoluto < 45){//frente
-            direcaoabsoluta = 1;
-        } else if (giroabsoluto >= 45 && giroabsoluto < 135) {//esquerda
-            direcaoabsoluta = 2;
-        }else if(giroabsoluto >= 135 && giroabsoluto < 225){//tras
-            direcaoabsoluta = 3;
-        } else if (giroabsoluto >= 225 && giroabsoluto < 315) {//direita
-            direcaoabsoluta = 4;
-        }
-    }
-    public void servoExtensor(double position){
-        servoExtensorDireita.setPosition(position);
-        servoExtensorEsquerda.setPosition(position);
-    }
-    public void mecanumesquerdabase(double power, double direcao){
-        if (direcao < 0){
-            direitaFrente.setPower(power);
-            direitaTras.setPower((power-direcao)*-1);
-            esquerdaFrente.setPower(power*-1);
-            esquerdaTras.setPower((power-direcao));
-        }else{
-            direitaFrente.setPower(power);
-            direitaTras.setPower((power-direcao)*-1);
-            esquerdaFrente.setPower(power*-1);
-            esquerdaTras.setPower((power-direcao));
-        }
-    }
+        // Configura o motor para utilizar o PIDF com o F calibrado
+        shooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        shooter.setVelocityPIDFCoefficients(SHOOTER_P, SHOOTER_I, SHOOTER_D, SHOOTER_F);
 
-    public void atualizargiro(){
-        if (giroabsoluto < 0){
-            giroabsoluto = 360 + giroabsoluto;
-        }else if (giroabsoluto > 360){
-            giroabsoluto = giroabsoluto - 360;
-        }
-    }
-    public void mecanumdireitabase(double power, double direcao){
-        if (direcao < 0){
-            direitaFrente.setPower((power-direcao)*-1);
-            direitaTras.setPower(power);
-            esquerdaFrente.setPower((power-direcao));
-            esquerdaTras.setPower(power*-1);
-        }else{
-            direitaFrente.setPower(power*-1);
-            direitaTras.setPower((power-direcao));
-            esquerdaFrente.setPower(power);
-            esquerdaTras.setPower((power-direcao)*-1);
-        }
-    }
-    public void movDirecionado(double power, double direcao){
-        if (power < 0) {
-            if (direcao >= 0){
-                direitaFrente.setPower(power+direcao);
-                direitaTras.setPower(power+direcao);
-                esquerdaFrente.setPower(power);
-                esquerdaTras.setPower(power);
-            }else{
-                direitaFrente.setPower(power);
-                direitaTras.setPower(power);
-                esquerdaFrente.setPower(power-direcao);
-                esquerdaTras.setPower(power-direcao);
-            }
-        }else{
-            if (direcao >= 0) {
-                direitaFrente.setPower(power);
-                direitaTras.setPower(power);
-                esquerdaFrente.setPower(power-direcao);
-                esquerdaTras.setPower(power-direcao);
+        while (opModeIsActive()) {
+            // =======================================================
+            // 1. PINPOINT ODOMETRY E RESET NO BOTÃO X (GAMEPAD 1)
+            // =======================================================
 
+
+            // =======================================================
+            // 2. TRACKING E BUSCA AUTOMÁTICA DA TORRETA (PROCURA DE TAG)
+            // =======================================================
+            limelight.update();
+
+            double powerTorretaManual = gamepad2.left_stick_x;
+
+            if (Math.abs(powerTorretaManual) > 0.1) {
+                // Override manual no Gamepad 2
+                torreta.setPower(powerTorretaManual);
+                torreta1.setPower(powerTorretaManual);
+            } else if (limelight.isValid && Math.abs(limelight.getTx()) > 3 && !atirando && !passando) {
+                // TAG ENCONTRADA: Rastreia com PID pelo caminho mais curto
+                double targetTurretAngle = turretObjeto.getCurrentAngle() - limelight.getTx();
+                turretObjeto.goToAngleShortestPath(targetTurretAngle);
+                turretObjeto.update();
             } else {
-                direitaFrente.setPower(power+direcao);
-                direitaTras.setPower(power+direcao);
-                esquerdaFrente.setPower(power);
-                esquerdaTras.setPower(power);
+                turretObjeto.update();
             }
-        }
-    }
-    public void resetarimu(){
-        giroabsoluto += gyro();
-        if (giroabsoluto < 0){
-            giroabsoluto = 360 + giroabsoluto;
-        }else if (giroabsoluto > 360){
-            giroabsoluto = giroabsoluto - 360;
-        }
-        imu.resetYaw();
-    }
-    /*public void resetarEncoderOdometria() {
-        odometriaX.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
-        odometriaX.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-        odometriaY.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
-        odometriaY.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-    }*/
-    public void parar(){
-        direitaFrente.setPower(0);
-        direitaTras.setPower(0);
-        esquerdaFrente.setPower(0);
-        esquerdaTras.setPower(0);
-    }
-    public void resetarEncoderOdometriaX(){
-        odometriaX.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
-        odometriaX.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-    }
-    public void resetarEncoderOdometriaY(){
-        odometriaY.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
-        odometriaY.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-    }
-    public void resetarEncoderOdometriasXY(){
-        resetarEncoderOdometriaY();
-        resetarEncoderOdometriaX();
-    }
-    public void mecanumDirecionado(double power, double direcao){
-        if (power > 0) {
-            if (direcao >= 0){
-                direitaFrente.setPower(power*-1);
-                direitaTras.setPower(power-direcao);
-                esquerdaFrente.setPower(power-direcao);
-                esquerdaTras.setPower(power*-1);
-            }else{
-                direitaFrente.setPower((power+direcao)*-1);
-                direitaTras.setPower(power);
-                esquerdaFrente.setPower(power);
-                esquerdaTras.setPower((power+direcao)*-1);
+
+            double x = gamepad1.left_stick_x;
+            double y = -gamepad1.left_stick_y;
+
+            double power = Math.min(Math.hypot(x, y), 1);
+            double[] direction = getDirection(x, y);
+
+            double moveX = direction[0] * power * multiplicador;
+            double moveY = direction[1] * power * multiplicador;
+
+            double turnInput = gamepad1.right_stick_x * curvapower;
+
+            mecanum(moveX, moveY, rx + turnInput);
+
+
+            if (gamepad2.right_bumper) {
+                velinicial += 5;
+                shooterVelocity = velinicial;
+                sleep(100);
             }
-        }else{
-            if (direcao >= 0){
-                direitaFrente.setPower((power+direcao)*-1);
-                direitaTras.setPower(power);
-                esquerdaFrente.setPower(power);
-                esquerdaTras.setPower((power+direcao)*-1);
-            }else{
-                direitaFrente.setPower(power*-1);
-                direitaTras.setPower(power-direcao);
-                esquerdaFrente.setPower(power-direcao);
-                esquerdaTras.setPower(power*-1);
+            if (gamepad2.left_bumper) {
+                shooterVelocity = velinicial;
+                velinicial -= 5;
+                sleep(100);
             }
+            shooter.setVelocityPIDFCoefficients(SHOOTER_P, SHOOTER_I, SHOOTER_D, SHOOTER_F);
+            double shooterTicksPerSec = (shooterVelocity * shot * shooterTicksPerRev) / 60.0;
+            shooter.setVelocity(shooterTicksPerSec);
+            currentShooterRPM = (shooter.getVelocity() * 60.0) / shooterTicksPerRev;
+            // Servo Transfer (Gamepad 1)
+
+
+            // =======================================================
+            // 5. MOTORES TRANSFER E INTAKE (GATILHOS RT / LT)
+            // =======================================================
+            double transferPower = gamepad1.right_trigger - gamepad1.left_trigger;
+            if (Math.abs(transferPower) > 0.15) {
+                transfer.setPower(transferPower);
+                intake.setPower(transferPower);
+            } else if(!passando && !atirando){
+                transfer.setPower(0.0);
+                intake.setPower(0.0);
+            }
+
+            if (gamepad1.right_bumper && !atirando) {
+                if (currentShooterRPM >= shooterVelocity - 100) {
+                    intake.setPower(0.6);
+                    passador.setVelocity(convertRPMtoTicks(5500));
+                    transfer.setVelocity(convertRPMtoTicks(5000));
+                    timer.reset();
+                    passando = true;
+                }
+            }
+            if (passando) {
+                if (transfer.getVelocity() > convertRPMtoTicks(1300)) {
+                    atirando = true;
+                    passando = false;
+                    servorampa.setPosition(0.5);
+                    transfer.setVelocity(convertRPMtoTicks(5000));
+                    sleep(500);
+                }
+            }
+
+            if (atirando) {
+                shooterVelocity += incremento;
+                shooter.setVelocity(convertRPMtoTicks(shooterVelocity));
+                intake.setPower(1);
+                if (timer.time() > 2.3) {
+                    atirando = false;
+                    timer.reset();
+                    transfer.setVelocity(0.0);
+                    passador.setVelocity(0);
+                }
+            }
+            if (!atirando) {
+                shooterVelocity = velinicial;
+                servorampa.setPosition(1);
+            }
+
+            // =======================================================
+            // 6. TELEMETRIA COMPLETA DE DADOS E ODOMETRIA
+            // =======================================================
+            double dist = getDistance(limelight.getTy());
+
+            telemetry.addData("--- TORRETA TRACKING (60, 60) ---", "");
+            telemetry.addData("Torreta Ângulo Atual", "%.2f°", turretObjeto.getCurrentAngle());
+            telemetry.addData("Torreta Target Angle", "%.2f°", turretObjeto.getTargetAngle());
+            telemetry.addData("Torreta Output PID", "%.2f", turretObjeto.getOutput());
+            telemetry.addData("distancia", getDistance(limelight.getTy()));
+            telemetry.addData("ty", limelight.getTy());
+            telemetry.addData("--- SHOOTER (GAMEPAD 2) ---", "");
+            telemetry.addData("Shooter Target RPM", shooterVelocity);
+            telemetry.addData("Shooter Current RPM", "%.2f", currentShooterRPM);
+            telemetry.addData("--- MECANISMOS ---", "");
+            telemetry.update();
         }
     }
 
-    public double gyro(){
+    public double[] getDirection(double x, double y) {
+        double deadband = 0.15;
+        if (Math.hypot(x, y) < deadband) {
+            index = -1;
+            return new double[]{0, 0};
+        }
+        double angle = Math.toDegrees(Math.atan2(y, x));
+        if (angle < 0) {
+            angle += 360;
+        }
+        index = ((int) ((angle + 22.5) / 45)) % 8;
+        return DIRECTIONS[index];
+    }
+
+    public double headingPID() {
+        erro = gyro() - alvo;
+        proporcional = kp * erro;
+        integral += erro;
+        integral = Math.max(-100, Math.min(100, integral));
+        double termoIntegral = integral * ki;
+        double derivativa = (erro - ultimoErro) * kd;
+        ultimoErro = erro;
+        return (proporcional + termoIntegral + derivativa) / 100.0;
+    }
+
+    public int convertRPMtoTicks(int rpm) {
+        return rpm * 28 / 60;
+    }
+
+    public void mecanum(double x, double y, double rx) {
+
+        double denominator = Math.max(Math.abs(y) + Math.abs(x) + Math.abs(rx), 1);
+        double frontLeftPower = (y + x + rx) / denominator;
+        double backLeftPower = (y - x + rx) / denominator;
+        double frontRightPower = (y - x - rx) / denominator;
+        double backRightPower = (y + x - rx) / denominator;
+
+        esquerdaFrente.setPower(-frontLeftPower);
+        esquerdaTras.setPower(backLeftPower);
+        direitaFrente.setPower(frontRightPower);
+        direitaTras.setPower(backRightPower);
+    }
+    public double getDistance(double ty) {
+        double targetHeight = 1.21;   // 1,21 metros do chão
+        double cameraHeight = 0.412;  // 41,2 cm do chão (0,412 m)
+        double cameraAngle = 48.0;    // 48 graus de inclinação da horizontal
+
+        double angle = cameraAngle + ty;
+        telemetry.addData("angle" , angle);
+        telemetry.addData("target/camera: ", targetHeight-cameraHeight);
+        telemetry.addData("tan", Math.tan(Math.toRadians(angle)));
+        return (targetHeight - cameraHeight) * Math.tan(Math.toRadians(angle));
+    }
+
+    public double gyro() {
         return imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES);
     }
 }
