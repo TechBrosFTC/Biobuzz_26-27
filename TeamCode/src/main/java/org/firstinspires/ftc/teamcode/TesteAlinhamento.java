@@ -13,7 +13,7 @@ public class TesteAlinhamento extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
-        limelight = new Limelight(hardwareMap);
+        limelight = new Limelight(hardwareMap, 0);
         DriveTrain driveTrain = new DriveTrain(hardwareMap);
 
         double fator = 0.1;

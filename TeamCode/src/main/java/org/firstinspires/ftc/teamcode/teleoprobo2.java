@@ -138,7 +138,7 @@ public class teleoprobo2 extends LinearOpMode {
                     state = "parado";
                 }
 
-                mecanum(moveX, moveY, rx + ((kpLimelight) * fator));
+                mecanum(moveX, moveY, rx * fator);
             }
 
             // =======================================================

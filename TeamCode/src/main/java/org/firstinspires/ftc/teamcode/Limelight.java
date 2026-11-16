@@ -9,9 +9,9 @@ public class Limelight {
     private LLResult result;
     private double tx = 0, ty = 0, ta = 0;
     public boolean isValid = false;
-    public Limelight(HardwareMap hardwareMap) {
+    public Limelight(HardwareMap hardwareMap, int pipeline) {
         this.limelight = hardwareMap.get(Limelight3A.class, "limelight");
-        this.limelight.pipelineSwitch(0);
+        this.limelight.pipelineSwitch(pipeline);
         this.limelight.setPollRateHz(90);
         limelight.start();
     }
