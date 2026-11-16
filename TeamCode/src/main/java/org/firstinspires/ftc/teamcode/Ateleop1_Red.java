@@ -1,8 +1,6 @@
 package org.firstinspires.ftc.teamcode;
 
-import com.acmerobotics.dashboard.config.Config;
-import com.acmerobotics.dashboard.FtcDashboard;
-import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
+
 import com.qualcomm.hardware.gobilda.GoBildaPinpointDriver;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -15,6 +13,7 @@ import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.util.Range;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
@@ -23,9 +22,9 @@ import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 
 
 
-@Config
+
 @TeleOp(name = "Ateleop1")
-public class Ateleop1 extends LinearOpMode {
+public class Ateleop1_Red extends LinearOpMode {
 
     // --- SENSORES E NAVEGAÇÃO / CHASSI ---
     private IMU imu;
@@ -47,7 +46,7 @@ public class Ateleop1 extends LinearOpMode {
 
     // --- SERVOS E TORRETA INSTANCIADA ---
     private Servo servorampa;
-    private Servo servoPosicional;
+    private Servo servoflor;
     private CRServo torreta;
     private CRServo torreta1;
     private DcMotorEx encoder_torreta;
@@ -73,7 +72,7 @@ public class Ateleop1 extends LinearOpMode {
     public static double SHOOTER_F = 13.4291;
 
     // Transfer PIDF
-    public static double TRANSFER_P = 8;
+    public static double TRANSFER_P = 15;
     public static double TRANSFER_I = 0.0;
     public static double TRANSFER_D = 0.0;
     public static double TRANSFER_F = 12.41;
@@ -100,6 +99,9 @@ public class Ateleop1 extends LinearOpMode {
     double kd = 0;
     double ki = 0;
 
+    double turret_kp = 0.01, turret_ki = 0, turret_kd = 0, turret_kf = 0;
+    double turret_lasterror = 0, turret_integral = 0;
+
     double erro;
     double proporcional;
     double integral = 0;
@@ -115,9 +117,9 @@ public class Ateleop1 extends LinearOpMode {
     public static double incremento = 0;
     double shot = 1;
     double countshot = 1;
-    public static int shooterVelocity = 2815;
+    public static int shooterVelocity = 2760;
     double shooterTicksPerRev = 28.0;
-    public static int velinicial = 2815;
+    public static int velinicial = 2760;
     public static double currentShooterRPM = 0;
     boolean atirando = false;
 
@@ -135,7 +137,6 @@ public class Ateleop1 extends LinearOpMode {
 
     @Override
     public void runOpMode() throws InterruptedException {
-        telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
 
         ElapsedTime timer = new ElapsedTime();
         // Inicialização do IMU
@@ -187,9 +188,9 @@ public class Ateleop1 extends LinearOpMode {
         torreta1 = hardwareMap.get(CRServo.class, "torreta1");
 
         torreta1.setDirection(DcMotorSimple.Direction.REVERSE);
-        torreta.setDirection(DcMotorSimple.Direction.REVERSE);
+        torreta.setDirection(DcMotorSimple.Direction.FORWARD);
 
-        encoder_torreta = hardwareMap.get(DcMotorEx.class, "leftFront");
+        encoder_torreta = hardwareMap.get(DcMotorEx.class, "intake");
 
         double ticksPerDegreeTurret = 8192.0 / 36;
         turretObjeto = new Turret(torreta, torreta1, encoder_torreta, ticksPerDegreeTurret, DcMotorSimple.Direction.REVERSE);
@@ -209,9 +210,10 @@ public class Ateleop1 extends LinearOpMode {
         telemetry.addData("Status", "Inicializado com sucesso!");
         telemetry.update();
 
-        limelight = new Limelight(hardwareMap);
+        limelight = new Limelight(hardwareMap, 1);
 
-        DriveTrain driveTrain = new DriveTrain(hardwareMap);
+        servoflor = hardwareMap.get(Servo.class, "servoflor");
+
 
         double fator = 0.1;
         double kpLimelight = 0.2;
@@ -302,19 +304,37 @@ public class Ateleop1 extends LinearOpMode {
             // =======================================================
             limelight.update();
 
+            if(gamepad2.left_bumper){
+                servoflor.setPosition(0);
+            }
+            else if(gamepad2.right_bumper){
+                servoflor.setPosition(1);
+            }else{
+                servoflor.setPosition(0.5);
+            }
+
             double powerTorretaManual = gamepad2.left_stick_x;
 
             if (Math.abs(powerTorretaManual) > 0.1) {
                 // Override manual no Gamepad 2
                 torreta.setPower(powerTorretaManual);
                 torreta1.setPower(powerTorretaManual);
-            } else if (limelight.isValid && Math.abs(limelight.getTx()) > 3 && !atirando && !passando) {
+            } else if (limelight.isValid) {
                 // TAG ENCONTRADA: Rastreia com PID pelo caminho mais curto
-                double targetTurretAngle = turretObjeto.getCurrentAngle() - limelight.getTx();
-                turretObjeto.goToAngleShortestPath(targetTurretAngle);
-                turretObjeto.update();
+                double error = limelight.getTx();
+                if(Math.abs(error) >= 4){
+                    double proporcional = turret_kp * error;
+                    turret_integral += error*turret_ki;
+                    double derivada = (error - turret_lasterror) * turret_kd;
+                    turret_lasterror = error;
+                    double feedforward = turret_kf * Math.signum(error);
+                    double output = proporcional + turret_integral + derivada;
+                    torreta.setPower(output);
+                    torreta1.setPower(output);
+                }
             } else {
-                turretObjeto.update();
+                torreta.setPower(0.0);
+                torreta1.setPower(0.0);
             }
 
             double x = gamepad1.left_stick_x;
@@ -331,7 +351,7 @@ public class Ateleop1 extends LinearOpMode {
             mecanum(moveX, moveY, rx + turnInput);
 
 
-            if (gamepad2.right_bumper) {
+            if (gamepad2.left_trigger > 0.1 ) {
                 velinicial += 5;
                 shooterVelocity = velinicial;
                 sleep(100);
@@ -364,17 +384,17 @@ public class Ateleop1 extends LinearOpMode {
                 if (currentShooterRPM >= shooterVelocity - 100) {
                     intake.setPower(0.6);
                     passador.setVelocity(convertRPMtoTicks(5500));
-                    transfer.setVelocity(convertRPMtoTicks(5000));
+                    transfer.setVelocity(convertRPMtoTicks(4000));
                     timer.reset();
                     passando = true;
                 }
             }
             if (passando) {
-                if (transfer.getVelocity() > convertRPMtoTicks(1300)) {
+                if (transfer.getVelocity() > convertRPMtoTicks(1600)) {
                     atirando = true;
                     passando = false;
                     servorampa.setPosition(0.5);
-                    transfer.setVelocity(convertRPMtoTicks(5000));
+                    transfer.setVelocity(convertRPMtoTicks(4000));
                     sleep(500);
                 }
             }
@@ -398,14 +418,11 @@ public class Ateleop1 extends LinearOpMode {
             // =======================================================
             // 6. TELEMETRIA COMPLETA DE DADOS E ODOMETRIA
             // =======================================================
-            double dist = getDistance(limelight.getTy());
 
             telemetry.addData("--- TORRETA TRACKING (60, 60) ---", "");
             telemetry.addData("Torreta Ângulo Atual", "%.2f°", turretObjeto.getCurrentAngle());
-            telemetry.addData("Torreta Target Angle", "%.2f°", turretObjeto.getTargetAngle());
+            telemetry.addData("Tx: ", "%.2f°", limelight.getTx());
             telemetry.addData("Torreta Output PID", "%.2f", turretObjeto.getOutput());
-            telemetry.addData("distancia", getDistance(limelight.getTy()));
-            telemetry.addData("ty", limelight.getTy());
             telemetry.addData("--- SHOOTER (GAMEPAD 2) ---", "");
             telemetry.addData("Shooter Target RPM", shooterVelocity);
             telemetry.addData("Shooter Current RPM", "%.2f", currentShooterRPM);

@@ -21,17 +21,17 @@ public class Turret {
     private DcMotorEx encoder;
 
     // Limites de rotação da torreta em graus (±540°)
-    public static final double MIN_ANGLE = -180;
-    public static final double MAX_ANGLE = 180;
+    public static double MIN_ANGLE = -80;
+    public static double MAX_ANGLE = 80;
 
     // Fator de conversão Ticks por Grau
-    private double ticksPerDegree = 8192.0 / 360.0;
+    private double ticksPerDegree = 8192.0 / 36;
 
     // Parâmetros e Estado do Controlador PIDF
-    private double kp = 0.25;      // Ganho proporcional aumentado para resposta mais firme
-    private double ki = 0.0005;    // Ganho integral para vencer erro estático acumulado
-    private double kd = 0.1;     // Ganho derivativo para amortecimento
-    private double kf = 0.2;      // Feedforward estático para vencer o atrito mecânico (stiction)
+    private double kp = 0.02;      // Ganho proporcional aumentado para resposta mais firme
+    private double ki = 0;    // Ganho integral para vencer erro estático acumulado
+    private double kd = 0.05;     // Ganho derivativo para amortecimento
+    private double kf = 0.05;      // Feedforward estático para vencer o atrito mecânico (stiction)
 
     private double tolerance = 4.5; // Tolerância em graus para parar no alvo exato
 
