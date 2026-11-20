@@ -57,11 +57,12 @@ public class Ateleop1_Blue extends LinearOpMode {
     private DcMotorEx encoder_torreta;
     private Turret turretObjeto;
 
+
+
     private Servo hood;
 
     // --- ALVO DE TRACKING DA TORRETA (60, 60 em Polegadas/MM) ---
-    public static double TARGET_X = 60.0;
-    public static double TARGET_Y = 60.0;
+
 
     // --- CONFIGURAÇÕES DE TRANSFER E INTAKE ---
     public static String TRANSFER_NAME = "transfer";
@@ -70,27 +71,39 @@ public class Ateleop1_Blue extends LinearOpMode {
 
     // --- GANHOS PIDF TUNÁVEIS NO FTC DASHBOARD ---
     // Shooter PIDF
-    public static double SHOOTER_P = 150;
-    public static double SHOOTER_I = 0;
+    public static double SHOOTER_P = 0.0009;
+    public static double SHOOTER_I = 0.00001;
 
     int shot_count = 0;
 
     public static double SHOOTER_D = 0;
+    public static double SHOOTER_F = 0.000205;
+    public static double SHOOTER_RECOVERY = 0.01;
+    public static double SHOOTER_MAX_BOOST = 0.2;
+    public static double SHOOTER_A = 31.4;
+    public static double SHOOTER_B = 2650;
+
+    /* public static double SHOOTER_P = 120;
+    public static double SHOOTER_I = 0;
+
+    int shot_count = 0;
+
+    public static double SHOOTER_D = 0.01;
     public static double SHOOTER_F = 13.4291;
     public static double SHOOTER_A = 31.4;
-    public static double SHOOTER_B = 2760;
+    public static double SHOOTER_B = 2750;*/
 
     // Transfer PIDF
-    public static double TRANSFER_P = 35;
+    public static double TRANSFER_P = 80;
     public static double TRANSFER_I = 0.0;
     public static double TRANSFER_D = 0.0;
     public static double TRANSFER_F = 13;
 
     // Passador PIDF
-    public static double PASSADOR_P = 45;
+    public static double PASSADOR_P = 80;
     public static double PASSADOR_I = 0.0;
     public static double PASSADOR_D = 0.0;
-    public static double PASSADOR_F = 12.0;
+    public static double PASSADOR_F = 12.5;
 
     // --- POSIÇÕES AJUSTÁVEIS DO SERVO POSICIONAL ---
     public static double POS_ABERTO = 1.0;
@@ -117,6 +130,8 @@ public class Ateleop1_Blue extends LinearOpMode {
     double ultimoErro = 0;
     double alvo = 0;
 
+    boolean passo = false;
+
     double rx = 0;
     double multiplicador = 0.8;
     double curvapower = 0.65;
@@ -126,9 +141,9 @@ public class Ateleop1_Blue extends LinearOpMode {
     public static double incremento = 0;
     double shot = 1;
     double countshot = 1;
-    public static double shooterVelocity = 2760;
+    public static double shooterVelocity = 2765;
     double shooterTicksPerRev = 28.0;
-    public static int velinicial = 2760;
+    public static int velinicial = 2800;
     public static double currentShooterRPM = 0;
     boolean atirando = false;
 
@@ -143,6 +158,40 @@ public class Ateleop1_Blue extends LinearOpMode {
             { 0, -1}, // trás
             { 1, -1}  // trás-direita
     };
+    Thread mira = new Thread(new Runnable() {
+        @Override
+        public void run() {
+            while (opModeIsActive()){
+                double powerTorretaManual = gamepad2.left_stick_x;
+                if (Math.abs(powerTorretaManual) > 0.1) {
+                    // Override manual no Gamepad 2
+                    torreta.setPower(powerTorretaManual);
+                    torreta1.setPower(powerTorretaManual);
+                    shooterVelocity = SHOOTER_B;
+                } else if (limelight.isValid) {
+                    // TAG ENCONTRADA: Rastreia com PID pelo caminho mais curto
+                    double error = limelight.getTx()+1.5;
+                    if(Math.abs(error) >= 3){
+                        double proporcional = turret_kp * error;
+                        turret_integral += error*turret_ki;
+                        double derivada = (error - turret_lasterror) * turret_kd;
+                        turret_lasterror = error;
+                        double feedforward = turret_kf * Math.signum(error);
+                        double output = proporcional + turret_integral + derivada;
+                        torreta.setPower(output);
+                        torreta1.setPower(output);
+                        shooterVelocity = SHOOTER_A*(limelight.getTy()-27) + SHOOTER_B;
+                    }
+                } else {
+                    torreta.setPower(0.0);
+                    torreta1.setPower(0.0);
+                    shooterVelocity = SHOOTER_B;
+                }
+            }
+        }
+    });
+
+    CustomShooterV2 atirador;
 
     @Override
     public void runOpMode() throws InterruptedException {
@@ -174,19 +223,23 @@ public class Ateleop1_Blue extends LinearOpMode {
         esquerdaTras.setDirection(DcMotorSimple.Direction.REVERSE);
         esquerdaFrente.setDirection(DcMotorSimple.Direction.REVERSE);
 
+        direitaFrente.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        direitaTras.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        esquerdaTras.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        esquerdaFrente.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+
         boolean pause = false;
 
         // Mapeamento e Inicialização dos motores do Teste Shooter
         shooter = hardwareMap.get(DcMotorEx.class, "shooter");
         shooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        shooter.setVelocityPIDFCoefficients(SHOOTER_P, SHOOTER_I, SHOOTER_D, SHOOTER_F);
+        shooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
         shooter.setDirection(DcMotorSimple.Direction.FORWARD);
 
         // Mapeamento de Transfer e Intake
         transfer = hardwareMap.get(DcMotorEx.class, TRANSFER_NAME);
         transfer.setDirection(DcMotorSimple.Direction.REVERSE);
-        transfer.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        transfer.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         transfer.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         transfer.setVelocityPIDFCoefficients(TRANSFER_P, TRANSFER_I, TRANSFER_D, TRANSFER_F);
 
@@ -236,67 +289,93 @@ public class Ateleop1_Blue extends LinearOpMode {
         servorampa.setPosition(1);
 
         // =========================================================================
-        // SINTONIA DO FEEDFORWARD (F) DO SHOOTER APÓS INIT E ANTES DE START
+        // SINTONIA SIMULTÂNEA DO FEEDFORWARD (F) DO SHOOTER E PASSADOR
         // =========================================================================
 
         telemetry = new MultipleTelemetry(telemetry, FtcDashboard.getInstance().getTelemetry());
 
         waitForStart();
-        while (opModeIsActive()){
-            telemetry.addLine("=== CALIBRAÇÃO DO FEEDFORWARD (F) DO SHOOTER ===");
-            telemetry.addLine("Acelerando o motor do Shooter a 100% para medir velocidade máxima...");
+       /* while (opModeIsActive()){
+            telemetry.addLine("=== CALIBRAÇÃO SIMULTÂNEA DO FEEDFORWARD (F) ===");
+            telemetry.addLine("Acelerando Shooter e Passador a 100% para medir velocidades máximas...");
             telemetry.update();
 
             shooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
             shooter.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
             shooter.setPower(1.0);
 
+
+
+            passador.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+            passador.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+            passador.setPower(1.0);
+
             ElapsedTime calibTimer = new ElapsedTime();
             calibTimer.reset();
 
-            // Aguarda 500ms para vencer a inércia
+            // Aguarda 500ms para ambos vencerem a inércia
             while (opModeIsActive() && calibTimer.milliseconds() < 500) {
                 sleep(10);
             }
 
-            // Amostra a velocidade por 3 segundos para encontrar o valor máximo
-            double maxVelTicks = 0.0;
+            // Amostra a velocidade de ambos por 3 segundos para encontrar os valores máximos
+            double maxVelTicksShooter = 0.0;
+            double maxVelTicksPassador = 0.0;
             calibTimer.reset();
             while (opModeIsActive() && calibTimer.seconds() < 3.0) {
-                double currentVel = Math.abs(shooter.getVelocity());
-                if (currentVel > maxVelTicks) {
-                    maxVelTicks = currentVel;
+                double currentVelShooter = Math.abs(shooter.getVelocity());
+                if (currentVelShooter > maxVelTicksShooter) {
+                    maxVelTicksShooter = currentVelShooter;
                 }
-                double currentRPM = (currentVel * 60.0) / shooterTicksPerRev;
-                telemetry.addData("Calibrando Shooter - RPM Atual", "%.2f RPM", currentRPM);
-                telemetry.addData("Calibrando Shooter - Ticks/s Atual", "%.2f", currentVel);
+
+                double currentVelPassador = Math.abs(passador.getVelocity());
+                if (currentVelPassador > maxVelTicksPassador) {
+                    maxVelTicksPassador = currentVelPassador;
+                }
+
+                double currentRPMShooter = (currentVelShooter * 60.0) / shooterTicksPerRev;
+                double currentRPMPassador = (currentVelPassador * 60.0) / shooterTicksPerRev;
+
+                telemetry.addData("Shooter RPM Atual", "%.2f RPM", currentRPMShooter);
+                telemetry.addData("Shooter Ticks/s", "%.2f", currentVelShooter);
+                telemetry.addData("Passador RPM Atual", "%.2f RPM", currentRPMPassador);
+                telemetry.addData("Passador Ticks/s", "%.2f", currentVelPassador);
                 telemetry.update();
                 sleep(20);
             }
 
+            // Desliga ambos os motores
             shooter.setPower(0.0);
+            passador.setPower(0.0);
 
             // Fórmula da Documentação REV / FTC: F = 32767 / maxVelocityInTicksPerSecond
-            if (maxVelTicks > 0) {
-                SHOOTER_F = 32767.0 / maxVelTicks;
+            if (maxVelTicksShooter > 0) {
+                SHOOTER_F = 32767.0 / maxVelTicksShooter;
             }
-            double maxRPMCalculado = (maxVelTicks * 60.0) / shooterTicksPerRev;
+            if (maxVelTicksPassador > 0) {
+                PASSADOR_F = 32767.0 / maxVelTicksPassador;
+            }
             break;
 
 
         }
-
-        telemetry.addData("Status", "Inicializado! Aguardando Start...");
+        mira.start();
+        telemetry.addData("Status", "Calibração Concluída!");
         telemetry.addData("SHOOTER_F Configurado", "%.4f", SHOOTER_F);
-        telemetry.addLine("Dica: Pressione 'B' no Gamepad 1 para calibrar o F do Shooter.");
+        telemetry.addData("PASSADOR_F Configurado", "%.4f", PASSADOR_F);
         telemetry.update();
         sleep(50);
 
 
-        // Configura o motor para utilizar o PIDF com o F calibrado
-        shooter.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-        shooter.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-        shooter.setVelocityPIDFCoefficients(SHOOTER_P, SHOOTER_I, SHOOTER_D, SHOOTER_F);
+        // Configura os motores para utilizar o PIDF com os Fs calibrados
+
+
+
+        passador.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        passador.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        passador.setVelocityPIDFCoefficients(PASSADOR_P, PASSADOR_I, PASSADOR_D, PASSADOR_F);*/
+
+        atirador = new CustomShooterV2(shooter);
 
 
         while (opModeIsActive()) {
@@ -358,21 +437,15 @@ public class Ateleop1_Blue extends LinearOpMode {
             mecanum(moveX, moveY, rx + turnInput);
 
 
-            if (gamepad2.left_trigger > 0.1 ) {
-                velinicial += 5;
-                shooterVelocity = velinicial;
-                sleep(100);
-            }
-            if (gamepad2.left_bumper) {
-                shooterVelocity = velinicial;
-                velinicial -= 5;
-                sleep(100);
-            }
-            shooter.setVelocityPIDFCoefficients(SHOOTER_P, SHOOTER_I, SHOOTER_D, SHOOTER_F);
+
+            /*shooter.setVelocityPIDFCoefficients(SHOOTER_P, SHOOTER_I, SHOOTER_D, SHOOTER_F);
             double shooterTicksPerSec = (shooterVelocity * shot * shooterTicksPerRev) / 60.0;
             shooter.setVelocity(shooterTicksPerSec);
-            currentShooterRPM = (shooter.getVelocity() * 60.0) / shooterTicksPerRev;
+            currentShooterRPM = (shooter.getVelocity() * 60.0) / shooterTicksPerRev;*/
             // Servo Transfer (Gamepad 1)
+            atirador.setPIDF( SHOOTER_P, SHOOTER_I, SHOOTER_D, SHOOTER_F, SHOOTER_RECOVERY, SHOOTER_MAX_BOOST);
+            atirador.setTargetRPM(shooterVelocity);
+            atirador.update();
 
 
             // =======================================================
@@ -387,7 +460,50 @@ public class Ateleop1_Blue extends LinearOpMode {
                 intake.setPower(0.0);
             }
 
-            if (gamepad1.right_bumper && !atirando) {
+            if (gamepad1.right_bumper && !passando) {
+                if (atirador.isReady()) {
+                    passador.setVelocity(convertRPMtoTicks(5500));
+                    timer.reset();
+                    passando = true;
+                }
+            }
+            if (passando && passador.getVelocity() > convertRPMtoTicks(4500)) {
+                servorampa.setPosition(0.51);
+                sleep(500);
+                transfer.setVelocity(convertRPMtoTicks(1850));
+                intake.setPower(0.6);
+                atirando = true;
+                passando = false;
+            }
+            if(atirando){
+                if(timer.time() > 3){
+                    atirando = false;
+                }
+                /*if(transfer.getCurrentPosition() > (28*4)*2 && !passo){
+                    transfer.setPower(0);
+                    transfer.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    transfer.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    timer.reset();
+                    passo = !passo;
+                    shot_count ++;
+                }
+                if(timer.time() > 0.5 && passo){
+                    transfer.setVelocity(3000);
+                    passo = !passo;
+                    shot_count ++;
+                }
+                if(shot_count > 8){
+                    transfer.setVelocity(0);
+                    shot_count = 0;
+                    atirando = false;
+                }*/
+            }
+            if(!atirando && !passando){
+                servorampa.setPosition(1);
+                passador.setVelocity(0);
+            }
+
+            /*if (gamepad1.right_bumper && !atirando) {
                 if (currentShooterRPM >= shooterVelocity - 100) {
                     passador.setVelocity(convertRPMtoTicks(5200));
                     timer.reset();
@@ -423,11 +539,8 @@ public class Ateleop1_Blue extends LinearOpMode {
                 if (shot_count >= 8) {
                     atirando = false;
                 }
-            }
-            if (!atirando && !passando) {
-                servorampa.setPosition(1);
-                passador.setVelocity(0);
-            }
+            }*/
+
 
             // =======================================================
             // 6. TELEMETRIA COMPLETA DE DADOS E ODOMETRIA
@@ -440,7 +553,7 @@ public class Ateleop1_Blue extends LinearOpMode {
             telemetry.addData("Torreta Output PID", "%.2f", turretObjeto.getOutput());
             telemetry.addData("--- SHOOTER (GAMEPAD 2) ---", "");
             telemetry.addData("Shooter Target RPM", shooterVelocity);
-            telemetry.addData("Shooter Current RPM", "%.2f", currentShooterRPM);
+            telemetry.addData("Shooter Current RPM", "%.2f", atirador.getRPM());
             telemetry.addData("--- MECANISMOS ---", "");
             telemetry.addData("x", odo.getPosition().getX(INCH));
             telemetry.addData("y", odo.getPosition().getY(INCH));

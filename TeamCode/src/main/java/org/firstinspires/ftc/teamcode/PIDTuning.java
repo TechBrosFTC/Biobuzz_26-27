@@ -3,8 +3,6 @@ package org.firstinspires.ftc.teamcode;
 import com.acmerobotics.dashboard.FtcDashboard;
 import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.telemetry.MultipleTelemetry;
-import com.bylazar.configurables.PanelsConfigurables;
-import com.bylazar.configurables.annotations.Configurable;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -18,7 +16,6 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  * e calcula o valor teórico de F (F = 32767 / MaxTicksPerSec).
  */
 @Config
-@Configurable
 @TeleOp(name = "PIDTuningnew")
 public class PIDTuning extends LinearOpMode {
 
@@ -124,7 +121,6 @@ public class PIDTuning extends LinearOpMode {
         while (opModeIsActive()) {
 
             // Atualiza os parâmetros caso alterados pelo Dashboard
-            PanelsConfigurables.INSTANCE.refreshClass(this);
 
             // Atualiza os coeficientes no motor em tempo real apenas se forem alterados
             if (lastPIDF.p != kp || lastPIDF.i != ki || lastPIDF.d != kd || lastPIDF.f != f) {
