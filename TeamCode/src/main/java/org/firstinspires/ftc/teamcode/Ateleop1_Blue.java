@@ -78,10 +78,10 @@ public class Ateleop1_Blue extends LinearOpMode {
 
     public static double SHOOTER_D = 0;
     public static double SHOOTER_F = 0.000205;
-    public static double SHOOTER_RECOVERY = 0.01;
-    public static double SHOOTER_MAX_BOOST = 0.2;
+    public static double SHOOTER_RECOVERY = 0.1;
+    public static double SHOOTER_MAX_BOOST = 0.25;
     public static double SHOOTER_A = 31.4;
-    public static double SHOOTER_B = 2650;
+    public static double SHOOTER_B = 2595;
 
     /* public static double SHOOTER_P = 120;
     public static double SHOOTER_I = 0;
@@ -100,10 +100,15 @@ public class Ateleop1_Blue extends LinearOpMode {
     public static double TRANSFER_F = 13;
 
     // Passador PIDF
-    public static double PASSADOR_P = 80;
+    public static double PASSADOR_P = 0.002;
     public static double PASSADOR_I = 0.0;
     public static double PASSADOR_D = 0.0;
-    public static double PASSADOR_F = 12.5;
+    public static double PASSADOR_F = 0.00001;
+    public static double PASSADOR_RECOVERY = 0.1;
+    public static double targetrpm = 5000;
+    public static double PASSADOR_MAX_BOOST = 0.4;
+
+
 
     // --- POSIÇÕES AJUSTÁVEIS DO SERVO POSICIONAL ---
     public static double POS_ABERTO = 1.0;
@@ -376,6 +381,7 @@ public class Ateleop1_Blue extends LinearOpMode {
         passador.setVelocityPIDFCoefficients(PASSADOR_P, PASSADOR_I, PASSADOR_D, PASSADOR_F);*/
 
         atirador = new CustomShooterV2(shooter);
+        Passador transf = new Passador(passador);
 
 
         while (opModeIsActive()) {
@@ -447,6 +453,9 @@ public class Ateleop1_Blue extends LinearOpMode {
             atirador.setTargetRPM(shooterVelocity);
             atirador.update();
 
+            transf.setTargetRPM(targetrpm);
+            transf.setPIDF(PASSADOR_P, PASSADOR_I, PASSADOR_D, PASSADOR_F, PASSADOR_RECOVERY, PASSADOR_MAX_BOOST);
+            transf.update();
 
             // =======================================================
             // 5. MOTORES TRANSFER E INTAKE (GATILHOS RT / LT)
@@ -462,12 +471,11 @@ public class Ateleop1_Blue extends LinearOpMode {
 
             if (gamepad1.right_bumper && !passando) {
                 if (atirador.isReady()) {
-                    passador.setVelocity(convertRPMtoTicks(5500));
                     timer.reset();
                     passando = true;
                 }
             }
-            if (passando && passador.getVelocity() > convertRPMtoTicks(4500)) {
+            if (passando && transf.isReady()) {
                 servorampa.setPosition(0.51);
                 sleep(500);
                 transfer.setVelocity(convertRPMtoTicks(1850));
@@ -500,7 +508,6 @@ public class Ateleop1_Blue extends LinearOpMode {
             }
             if(!atirando && !passando){
                 servorampa.setPosition(1);
-                passador.setVelocity(0);
             }
 
             /*if (gamepad1.right_bumper && !atirando) {
