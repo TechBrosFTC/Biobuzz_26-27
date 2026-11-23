@@ -24,8 +24,8 @@ public class Turret {
     public static double MIN_ANGLE = -80;
     public static double MAX_ANGLE = 80;
 
-    // Fator de conversão Ticks por Grau
-    private double ticksPerDegree = 8192.0 / 36;
+    // Fator de conversão Ticks por Grau (8192 ticks por revolução completa de 360°)
+    private double ticksPerDegree = 8192.0 / 360.0;
 
     // Parâmetros e Estado do Controlador PIDF
     private double kp = 0.02;      // Ganho proporcional aumentado para resposta mais firme
@@ -130,6 +130,51 @@ public class Turret {
      */
     public void setTargetAngle(double angleDegrees) {
         this.targetAngle = Range.clip(angleDegrees, MIN_ANGLE, MAX_ANGLE);
+    }
+
+    /**
+     * Move a torreta para o ângulo absoluto alvo (0° = Reta pro robô, Positivo = Direita, Negativo = Esquerda)
+     * com uma rampa de desaceleração (função afim) entre maxPower e minPower nos últimos 5°.
+     *
+     * @param targetAngle Graus absoluto alvo
+     * @param maxPower Potência máxima
+     * @param minPower Potência mínima
+     */
+    public void goToTargetAngle(double targetAngle, double maxPower, double minPower) {
+        double currentAngle = getCurrentAngle();
+        // Diferença angular absoluta direta
+        double delta = targetAngle - currentAngle;
+
+        double dist = Math.abs(delta);
+        if (dist <= tolerance) {
+            if (crServo1 != null && crServo2 != null) {
+                crServo1.setPower(0.0);
+                crServo2.setPower(0.0);
+            }
+            lastOutput = 0.0;
+            return;
+        }
+
+        double rampDistance = Math.min(5.0, dist);
+
+        double power;
+        if (dist > 5.0) {
+            power = maxPower;
+        } else {
+            // Função afim de desaceleração de maxPower até minPower: f(dist) = minPower + ((maxPower - minPower) / rampDistance) * dist
+            power = rampDistance > 0 ? minPower + ((maxPower - minPower) / rampDistance) * dist : minPower;
+        }
+
+        power = Range.clip(power, minPower, maxPower);
+        double direction = Math.signum(delta);
+        double outputPower = power * direction;
+
+        lastOutput = outputPower;
+
+        if (crServo1 != null && crServo2 != null) {
+            crServo1.setPower(outputPower);
+            crServo2.setPower(-outputPower);
+        }
     }
 
     /**

@@ -51,11 +51,14 @@ public class Ateleop1_Blue extends LinearOpMode {
 
     // --- SERVOS E TORRETA INSTANCIADA ---
     private Servo servorampa;
-    private Servo servoflor;
+    private Servo servoflor, servoflor1;
     private CRServo torreta;
     private CRServo torreta1;
     private DcMotorEx encoder_torreta;
     private Turret turretObjeto;
+
+    public static int llajuste =  0;
+
 
 
 
@@ -73,15 +76,12 @@ public class Ateleop1_Blue extends LinearOpMode {
     // Shooter PIDF
     public static double SHOOTER_P = 0.0009;
     public static double SHOOTER_I = 0.00001;
-
-    int shot_count = 0;
-
-    public static double SHOOTER_D = 0;
-    public static double SHOOTER_F = 0.000205;
-    public static double SHOOTER_RECOVERY = 0.1;
+    public static double SHOOTER_D = 0.0001;
+    public static double SHOOTER_F = 0.00019;
+    public static double SHOOTER_RECOVERY = 0.08;
     public static double SHOOTER_MAX_BOOST = 0.25;
-    public static double SHOOTER_A = 31.4;
-    public static double SHOOTER_B = 2595;
+    public static double SHOOTER_A = 34;
+    public static double SHOOTER_B = 2555;
 
     /* public static double SHOOTER_P = 120;
     public static double SHOOTER_I = 0;
@@ -151,6 +151,8 @@ public class Ateleop1_Blue extends LinearOpMode {
     public static int velinicial = 2800;
     public static double currentShooterRPM = 0;
     boolean atirando = false;
+    boolean passando = false;
+
 
     // Direções discretas para translação
     private static final double[][] DIRECTIONS = {
@@ -175,7 +177,7 @@ public class Ateleop1_Blue extends LinearOpMode {
                     shooterVelocity = SHOOTER_B;
                 } else if (limelight.isValid) {
                     // TAG ENCONTRADA: Rastreia com PID pelo caminho mais curto
-                    double error = limelight.getTx()+1.5;
+                    double error = limelight.getTx();
                     if(Math.abs(error) >= 3){
                         double proporcional = turret_kp * error;
                         turret_integral += error*turret_ki;
@@ -243,7 +245,7 @@ public class Ateleop1_Blue extends LinearOpMode {
 
         // Mapeamento de Transfer e Intake
         transfer = hardwareMap.get(DcMotorEx.class, TRANSFER_NAME);
-        transfer.setDirection(DcMotorSimple.Direction.REVERSE);
+        transfer.setDirection(DcMotorSimple.Direction.FORWARD);
         transfer.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         transfer.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
         transfer.setVelocityPIDFCoefficients(TRANSFER_P, TRANSFER_I, TRANSFER_D, TRANSFER_F);
@@ -284,13 +286,13 @@ public class Ateleop1_Blue extends LinearOpMode {
         limelight = new Limelight(hardwareMap, 0);
 
         servoflor = hardwareMap.get(Servo.class, "servoflor");
+        servoflor1 = hardwareMap.get(Servo.class, "servoflor1");
 
 
         double fator = 0.1;
         double kpLimelight = 0.2;
         telemetry.setMsTransmissionInterval(11);
 
-        boolean passando = false;
         servorampa.setPosition(1);
 
         // =========================================================================
@@ -397,9 +399,11 @@ public class Ateleop1_Blue extends LinearOpMode {
 
             if(gamepad1.y){
                 servoflor.setPosition(0);
+                servoflor1.setPosition(0);
             }
             else if(gamepad1.x){
                 servoflor.setPosition(1);
+                servoflor1.setPosition(1);
             }
 
             double powerTorretaManual = gamepad2.left_stick_x;
@@ -411,8 +415,8 @@ public class Ateleop1_Blue extends LinearOpMode {
                 shooterVelocity = SHOOTER_B;
             } else if (limelight.isValid) {
                 // TAG ENCONTRADA: Rastreia com PID pelo caminho mais curto
-                double error = limelight.getTx();
-                if(Math.abs(error) >= 4){
+                double error = limelight.getTx()+llajuste;
+                if(Math.abs(error) >= 2){
                     double proporcional = turret_kp * error;
                     turret_integral += error*turret_ki;
                     double derivada = (error - turret_lasterror) * turret_kd;
@@ -421,7 +425,7 @@ public class Ateleop1_Blue extends LinearOpMode {
                     double output = proporcional + turret_integral + derivada;
                     torreta.setPower(output);
                     torreta1.setPower(output);
-                    shooterVelocity = SHOOTER_A*(limelight.getTy()-27) + SHOOTER_B;
+                    shooterVelocity = SHOOTER_A*(limelight.getTy()-22) + SHOOTER_B;
                 }
             } else {
                 torreta.setPower(0.0);
@@ -462,10 +466,10 @@ public class Ateleop1_Blue extends LinearOpMode {
             // =======================================================
             double transferPower = gamepad1.right_trigger - gamepad1.left_trigger;
             if (Math.abs(transferPower) > 0.15) {
-                transfer.setPower(transferPower);
+                transfer.setVelocity(1700*transferPower);
                 intake.setPower(transferPower);
             } else if(!passando && !atirando){
-                transfer.setPower(0.0);
+                transfer.setVelocity(0.0);
                 intake.setPower(0.0);
             }
 
@@ -476,35 +480,23 @@ public class Ateleop1_Blue extends LinearOpMode {
                 }
             }
             if (passando && transf.isReady()) {
-                servorampa.setPosition(0.51);
+                servorampa.setPosition(0.54);
                 sleep(500);
-                transfer.setVelocity(convertRPMtoTicks(1850));
+                transfer.setVelocity(convertRPMtoTicks(700));
                 intake.setPower(0.6);
                 atirando = true;
                 passando = false;
             }
             if(atirando){
-                if(timer.time() > 3){
+                if(timer.time() > 1 && timer.time() < 2){
+                    transfer.setVelocity(convertRPMtoTicks(1200));
+                }
+                if(timer.time() > 2.5){
+                    transfer.setVelocity(convertRPMtoTicks(1900));
+                }
+                if(timer.time() > 3.5){
                     atirando = false;
                 }
-                /*if(transfer.getCurrentPosition() > (28*4)*2 && !passo){
-                    transfer.setPower(0);
-                    transfer.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                    transfer.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                    timer.reset();
-                    passo = !passo;
-                    shot_count ++;
-                }
-                if(timer.time() > 0.5 && passo){
-                    transfer.setVelocity(3000);
-                    passo = !passo;
-                    shot_count ++;
-                }
-                if(shot_count > 8){
-                    transfer.setVelocity(0);
-                    shot_count = 0;
-                    atirando = false;
-                }*/
             }
             if(!atirando && !passando){
                 servorampa.setPosition(1);

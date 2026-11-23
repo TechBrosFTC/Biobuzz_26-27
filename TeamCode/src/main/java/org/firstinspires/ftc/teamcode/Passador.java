@@ -20,9 +20,16 @@ public class Passador {
     private double maxBoost = 0.15;
 
     // Detecção de Passagem do Elemento
-    private double passThreshold = 200.0;
+    private double passThreshold = 500;
     private double baselineRPM = 0.0;
     private double minPassRPM = 0.0;
+
+    // Adaptação Automática / Gradual do Feedforward (kF)
+    private boolean autoKFEnabled = true;
+    private double kFAdaptRate = 0.000001; // Taxa de ajuste gradual por segundo
+    private double underSpeedRatio = 0.90; // Se currentRPM < targetRPM * 0.90 (ficou muito abaixo do target)
+    private double minKF = 0.00001;
+    private double maxKF = 0.001;
 
     private double targetRPM = 0.0;
     private double currentRPM = 0.0;
@@ -93,6 +100,21 @@ public class Passador {
         }
 
         double error = targetRPM - currentRPM;
+
+        // Ajuste Adaptativo Gradual do Feedforward (kF) caso fique muito abaixo do target
+        if (autoKFEnabled && !recovering && targetRPM > 0) {
+            if (currentRPM < targetRPM * underSpeedRatio && output < 1.0) {
+                // Aumenta kF gradualmente proporcionalmente ao erro relativo e ao delta de tempo (dt)
+                double errorRatio = (targetRPM - currentRPM) / targetRPM;
+                kF += kFAdaptRate * errorRatio * dt;
+                kF = Math.min(maxKF, kF);
+            } else if (currentRPM > targetRPM * 1.08 && output > 0.0) {
+                // Reduz kF gradualmente caso o RPM esteja consideravelmente acima da meta
+                double overRatio = (currentRPM - targetRPM) / targetRPM;
+                kF -= kFAdaptRate * overRatio * dt;
+                kF = Math.max(minKF, kF);
+            }
+        }
 
         // Detecção de Passagem
         detectPass(now);
@@ -247,7 +269,7 @@ public class Passador {
     }
 
     public boolean isReady() {
-        return targetRPM > 0 && currentRPM >= targetRPM * 0.95;
+        return targetRPM > 0 && currentRPM >= targetRPM * 0.85;
     }
 
     public void stop() {
@@ -274,5 +296,25 @@ public class Passador {
 
     public void setPassThreshold(double threshold) {
         this.passThreshold = threshold;
+    }
+
+    public void setAutoKFEnabled(boolean enabled) {
+        this.autoKFEnabled = enabled;
+    }
+
+    public boolean isAutoKFEnabled() {
+        return autoKFEnabled;
+    }
+
+    public double getKF() {
+        return kF;
+    }
+
+    public void setKFAdaptRate(double rate) {
+        this.kFAdaptRate = rate;
+    }
+
+    public void setUnderSpeedRatio(double ratio) {
+        this.underSpeedRatio = ratio;
     }
 }

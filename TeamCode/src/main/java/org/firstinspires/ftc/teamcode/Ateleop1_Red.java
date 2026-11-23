@@ -192,7 +192,7 @@ public class Ateleop1_Red extends LinearOpMode {
 
         encoder_torreta = hardwareMap.get(DcMotorEx.class, "intake");
 
-        double ticksPerDegreeTurret = 8192.0 / 36;
+        double ticksPerDegreeTurret = 8192.0 / 360.0;
         turretObjeto = new Turret(torreta, torreta1, encoder_torreta, ticksPerDegreeTurret, DcMotorSimple.Direction.REVERSE);
         VoltageSensor voltagem;
         /*

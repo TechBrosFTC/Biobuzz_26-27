@@ -24,6 +24,14 @@ public class CustomShooterV2 {
     private double baselineRPM = 0;
     private double minShotRPM = 0;
 
+    // Adaptação Automática / Gradual do Feedforward (kF)
+    private boolean autoKFEnabled = true;
+    private double kFAdaptRate = 0.00001; // Taxa de ajuste gradual por segundo
+    private double underSpeedRatio = 0.90; // Se currentRPM < targetRPM * 0.90 (ficou muito abaixo do target)
+    private double overSpeedRatio = 1.08;  // Se currentRPM > targetRPM * 1.08 (ficou muito acima do target)
+    private double minKF = 0.00001;
+    private double maxKF = 0.00022;
+
     private double targetRPM = 0;
     private double currentRPM = 0;
     private double output = 0;
@@ -93,6 +101,21 @@ public class CustomShooterV2 {
         }
 
         double error = targetRPM - currentRPM;
+
+        // Ajuste Adaptativo Gradual do Feedforward (kF) caso fique muito abaixo ou muito acima do target
+        if (autoKFEnabled && !recovering && targetRPM > 0) {
+            if (currentRPM < targetRPM * underSpeedRatio && output < 1.0) {
+                // Ajuste gradual para cima se estiver muito abaixo do target
+                double errorRatio = (targetRPM - currentRPM) / targetRPM;
+                kF += kFAdaptRate * errorRatio * dt;
+                kF = Math.min(maxKF, kF);
+            } else if (currentRPM > targetRPM * overSpeedRatio && output > 0.0) {
+                // Ajuste gradual para baixo se estiver muito acima do target
+                double overRatio = (currentRPM - targetRPM) / targetRPM;
+                kF -= kFAdaptRate * overRatio * dt;
+                kF = Math.max(minKF, kF);
+            }
+        }
 
         // Shot Detection
         detectShot(now);
@@ -270,6 +293,7 @@ public class CustomShooterV2 {
 
         motor.setPower(0);
     }
+
     public void setPIDF(double p, double i, double d, double f, double recoveryGain, double maxBoost) {
         kP = p;
         kI = i;
@@ -277,6 +301,29 @@ public class CustomShooterV2 {
         kF = f;
         this.maxBoost = maxBoost;
         this.recoveryGain = recoveryGain;
+    }
 
+    public void setAutoKFEnabled(boolean enabled) {
+        this.autoKFEnabled = enabled;
+    }
+
+    public boolean isAutoKFEnabled() {
+        return autoKFEnabled;
+    }
+
+    public double getKF() {
+        return kF;
+    }
+
+    public void setKFAdaptRate(double rate) {
+        this.kFAdaptRate = rate;
+    }
+
+    public void setUnderSpeedRatio(double ratio) {
+        this.underSpeedRatio = ratio;
+    }
+
+    public void setOverSpeedRatio(double ratio) {
+        this.overSpeedRatio = ratio;
     }
 }
