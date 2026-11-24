@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.AccelConstraint;
+import com.acmerobotics.roadrunner.AngularVelConstraint;
 import com.acmerobotics.roadrunner.Arclength;
 import com.acmerobotics.roadrunner.Pose2dDual;
 import com.acmerobotics.roadrunner.PosePath;
@@ -51,16 +52,19 @@ public class Auto extends LinearOpMode {
             ElapsedTime elapsedTime = new ElapsedTime();
             elapsedTime.reset();
             while (elapsedTime.seconds() < 7.5 && opModeIsActive()){
-                sleep(10);
+                idle();
             }
 
             // Executa a transição para -33° com a rampa afim
             turret.goToTargetAngle(-33, 0.7, 0.35);
 
             // Mantém ativamente a torreta travada no ângulo alvo de -33° via PID pelo resto do autônomo
-            while (opModeIsActive()){
+            while (opModeIsActive() && elapsedTime.time() < 20){
                 turret.updatePID(-33);
-                sleep(15);
+            }
+            turret.goToTargetAngle(90, 0.7, 0.35);
+            while (opModeIsActive()){
+                turret.updatePID(90);
             }
         }
     });
@@ -85,6 +89,7 @@ public class Auto extends LinearOpMode {
             }
         };
         AccelConstraint baseAccelConstraint = new ProfileAccelConstraint(-40, 60);
+        AngularVelConstraint angularVelConstraint = new AngularVelConstraint(Math.toRadians(180));
 
         TrajectoryActionBuilder estacionar = drive.actionBuilder(initialPose)
                 .splineToConstantHeading(new Vector2d(-42, 45), Math.toRadians(0))
@@ -101,26 +106,31 @@ public class Auto extends LinearOpMode {
 
         TrajectoryActionBuilder flor = drive.actionBuilder(initialPose)
                 //.strafeTo(new Vector2d(0, 48), maxVel)
-                .splineToSplineHeading(new Pose2d(new Vector2d(-12, 44), Math.toRadians(90)), Math.toRadians(90), maxVel)
-                .strafeTo(new Vector2d(-25, 63.5), maxVel, baseAccelConstraint)
-                .strafeTo(new Vector2d(-25, 65), maxVel, baseAccelConstraint)
+                .splineToSplineHeading(new Pose2d(new Vector2d(-18, 44), Math.toRadians(90)), Math.toRadians(0), maxVel)
+                .strafeTo(new Vector2d(-18, 63.5), maxVel, baseAccelConstraint)
+                .strafeTo(new Vector2d(-18, 65))
+                .waitSeconds(0.4)
+                .strafeTo(new Vector2d(-18, 53), maxVel, baseAccelConstraint)
                 .waitSeconds(0.8);
 
 
-        TrajectoryActionBuilder third_shot = drive.actionBuilder(new Pose2d(-64, 62, Math.toRadians(90)))
-                .strafeToLinearHeading( new Vector2d(-52, 48), Math.toRadians(180), maxVel, baseAccelConstraint)
-                .strafeTo(new Vector2d(56, 48), maxVel, baseAccelConstraint);
 
-        TrajectoryActionBuilder second_shot = drive.actionBuilder(new Pose2d(-25, 65, Math.toRadians(90)))
+        TrajectoryActionBuilder second_shot = drive.actionBuilder(new Pose2d(-18, 53, Math.toRadians(90)))
                 .strafeToSplineHeading(new Vector2d(0, 48), Math.toRadians(180), maxVel, baseAccelConstraint)
                 .strafeTo(new Vector2d(56, 48), maxVel, baseAccelConstraint);
 
         TrajectoryActionBuilder second_flor = drive.actionBuilder(new Pose2d(56, 38, Math.toRadians(180)))
-                .strafeToSplineHeading(new Vector2d(52, 24), Math.toRadians(0))
-                .strafeTo(new Vector2d(56, 24));
+                .strafeToSplineHeading(new Vector2d(38, 18), Math.toRadians(0), maxVel, baseAccelConstraint)
+                .strafeTo(new Vector2d(60, 18), maxVel, baseAccelConstraint)
+                .strafeTo(new Vector2d(62, 18), maxVel, baseAccelConstraint)
+                .strafeTo(new Vector2d(56, 18))
+                .waitSeconds(1);
 
-        TrajectoryActionBuilder fourth_shot = drive.actionBuilder(new Pose2d(56, 24, Math.toRadians(0)))
-                .strafeToSplineHeading(new Vector2d( 48, 61), Math.toRadians(270));
+        TrajectoryActionBuilder third_shot = drive.actionBuilder(new Pose2d(56, 18, Math.toRadians(0)))
+                .turnTo(Math.toRadians(270));
+
+        TrajectoryActionBuilder parking = drive.actionBuilder(new Pose2d(new Vector2d(56,18), Math.toRadians(270)))
+                .strafeTo(new Vector2d(54, 66), maxVel, baseAccelConstraint);
 
 
 
@@ -130,8 +140,8 @@ public class Auto extends LinearOpMode {
         Action garden = gardens.build();
         Action shoot2 = second_shot.build();
         Action shoot3 = third_shot.build();
-        Action shoot4 = fourth_shot.build();
         Action flower2 = second_flor.build();
+        Action park = parking.build();
 
 
         Shooter shooter = new Shooter(hardwareMap);
@@ -144,15 +154,23 @@ public class Auto extends LinearOpMode {
 
         Actions.runBlocking(
                 new SequentialAction(
-                        shooter.prepareshot(2495),
+                        shooter.prepareshot(2515),
                         shooter.shoot(),
                         intake.intake_on(),
                         intake.rampaBaixo(),
                         flower,
-                        shooter.prepareshot(2565),
+                        shooter.prepareshot(2550),
                         intake.intake_off(),
                         shoot2,
-                        shooter.shoot()
+                        shooter.shoot1(),
+                        intake.intake_on(),
+                        flower2,
+                        intake.intake_off(),
+                        shoot3,
+                        shooter.shoot1(),
+                        park
+
+
 
 
                         /*shoot2,
@@ -336,7 +354,7 @@ public class Auto extends LinearOpMode {
                     while (opModeIsActive() && timer.time() < 2.5 && timer.time() > 0.5 ){
                         passador.update();
                         shooter.update();
-                        motor_transfer.setVelocity(convertRPMtoTicks(1200));
+                        motor_transfer.setVelocity(convertRPMtoTicks(1170));
                     }
                     while (opModeIsActive() && timer.time() < 3.5 && timer.time() > 1.5){
                         passador.update();
@@ -373,12 +391,12 @@ public class Auto extends LinearOpMode {
                         passador.update();
                         shooter.update();
                         intake.setPower(1);
-                        motor_transfer.setVelocity(convertRPMtoTicks(700));
+                        motor_transfer.setVelocity(convertRPMtoTicks(500));
                     }
                     while (opModeIsActive() && timer.time() < 3 && timer.time() > 0.5 ){
                         passador.update();
                         shooter.update();
-                        motor_transfer.setVelocity(convertRPMtoTicks(1350));
+                        motor_transfer.setVelocity(convertRPMtoTicks(1150));
                     }
                     motor_transfer.setVelocity(0);
                     servo_rampa.setPosition(1);

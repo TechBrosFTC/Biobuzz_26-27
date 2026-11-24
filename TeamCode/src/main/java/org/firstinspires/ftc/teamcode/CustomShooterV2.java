@@ -1,3 +1,4 @@
+
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -9,7 +10,7 @@ public class CustomShooterV2 {
 
     private static final double TICKS_PER_REV = 28;
 
-    // PIDF - ganhos para calibração
+    // PIDF
     private double kP = 0.00015;
     private double kI = 0.000001;
     private double kD = 0.000001;
@@ -20,17 +21,9 @@ public class CustomShooterV2 {
     private double maxBoost = 0.15;
 
     // Shot Detection
-    private double shotThreshold = 100;
+    private double shotThreshold = 50;
     private double baselineRPM = 0;
     private double minShotRPM = 0;
-
-    // Adaptação Automática / Gradual do Feedforward (kF)
-    private boolean autoKFEnabled = true;
-    private double kFAdaptRate = 0.00001; // Taxa de ajuste gradual por segundo
-    private double underSpeedRatio = 0.90; // Se currentRPM < targetRPM * 0.90 (ficou muito abaixo do target)
-    private double overSpeedRatio = 1.08;  // Se currentRPM > targetRPM * 1.08 (ficou muito acima do target)
-    private double minKF = 0.00001;
-    private double maxKF = 0.00022;
 
     private double targetRPM = 0;
     private double currentRPM = 0;
@@ -58,12 +51,11 @@ public class CustomShooterV2 {
     public CustomShooterV2(DcMotorEx motor) {
         this.motor = motor;
 
-        motor.setMode(
-            DcMotor.RunMode.RUN_WITHOUT_ENCODER
-        );
+        motor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
     }
 
     public void setTargetRPM(double rpm) {
+
         if (rpm != targetRPM) {
             integral = 0;
             lastError = 0;
@@ -102,34 +94,18 @@ public class CustomShooterV2 {
 
         double error = targetRPM - currentRPM;
 
-        // Ajuste Adaptativo Gradual do Feedforward (kF) caso fique muito abaixo ou muito acima do target
-        if (autoKFEnabled && !recovering && targetRPM > 0) {
-            if (currentRPM < targetRPM * underSpeedRatio && output < 1.0) {
-                // Ajuste gradual para cima se estiver muito abaixo do target
-                double errorRatio = (targetRPM - currentRPM) / targetRPM;
-                kF += kFAdaptRate * errorRatio * dt;
-                kF = Math.min(maxKF, kF);
-            } else if (currentRPM > targetRPM * overSpeedRatio && output > 0.0) {
-                // Ajuste gradual para baixo se estiver muito acima do target
-                double overRatio = (currentRPM - targetRPM) / targetRPM;
-                kF -= kFAdaptRate * overRatio * dt;
-                kF = Math.max(minKF, kF);
-            }
-        }
-
         // Shot Detection
         detectShot(now);
 
-        // Recovery measurement
+        // Recovery Measurement
         updateRecovery(now);
 
         // PID
-        double derivative =
-            (error - lastError) / dt;
+        double derivative = (error - lastError) / dt;
 
         filteredDerivative =
-            0.8 * filteredDerivative +
-            0.2 * derivative;
+                0.8 * filteredDerivative +
+                        0.2 * derivative;
 
         double p = kP * error;
         double d = kD * filteredDerivative;
@@ -140,33 +116,33 @@ public class CustomShooterV2 {
 
         if (recovering && error > 0) {
             boost = Math.min(
-                maxBoost,
-                error * recoveryGain
+                    maxBoost,
+                    error * recoveryGain
             );
         }
 
-        // Anti-windup
+        // Anti-Windup
         double candidateIntegral =
-            integral + error * dt;
+                integral + error * dt;
 
         candidateIntegral = Math.max(
-            -1000,
-            Math.min(1000, candidateIntegral)
+                -1000,
+                Math.min(1000, candidateIntegral)
         );
 
         double candidateOutput =
-            p + kI * candidateIntegral + d + f + boost;
+                p + kI * candidateIntegral + d + f + boost;
 
         if ((candidateOutput >= 0 &&
-             candidateOutput <= 1) ||
-             (candidateOutput > 1 && error < 0) ||
-             (candidateOutput < 0 && error > 0)) {
+                candidateOutput <= 1) ||
+                (candidateOutput > 1 && error < 0) ||
+                (candidateOutput < 0 && error > 0)) {
 
             integral = candidateIntegral;
         }
 
         output =
-            p + kI * integral + d + f + boost;
+                p + kI * integral + d + f + boost;
 
         output = Math.max(0, Math.min(1, output));
 
@@ -174,19 +150,20 @@ public class CustomShooterV2 {
 
         lastError = error;
 
-        // Baseline de RPM
+        // Baseline RPM
         if (!recovering &&
-            currentRPM > targetRPM * 0.8) {
+                currentRPM > targetRPM * 0.8) {
 
             baselineRPM =
-                0.95 * baselineRPM +
-                0.05 * currentRPM;
+                    0.95 * baselineRPM +
+                            0.05 * currentRPM;
         }
     }
 
     private double getMeasuredRPM() {
+
         return motor.getVelocity() *
-               60.0 / TICKS_PER_REV;
+                60.0 / TICKS_PER_REV;
     }
 
     private void detectShot(long now) {
@@ -222,8 +199,8 @@ public class CustomShooterV2 {
         if (!recovering) return;
 
         minShotRPM = Math.min(
-            minShotRPM,
-            currentRPM
+                minShotRPM,
+                currentRPM
         );
 
         double recoveryTarget = targetRPM * 0.95;
@@ -237,7 +214,7 @@ public class CustomShooterV2 {
             if (now - recoveryStableStart >= 100_000_000L) {
 
                 lastRecoveryMs =
-                    (now - recoveryStart) / 1_000_000L;
+                        (now - recoveryStart) / 1_000_000L;
 
                 recovering = false;
                 recoveryCompleted = true;
@@ -247,6 +224,8 @@ public class CustomShooterV2 {
             recoveryStableStart = 0;
         }
     }
+
+    // Getters
 
     public double getRPM() {
         return currentRPM;
@@ -258,6 +237,10 @@ public class CustomShooterV2 {
 
     public double getBoost() {
         return boost;
+    }
+
+    public double getKF() {
+        return kF;
     }
 
     public double getMinShotRPM() {
@@ -276,10 +259,16 @@ public class CustomShooterV2 {
         return recovering;
     }
 
+    public boolean isRecoveryCompleted() {
+        return recoveryCompleted;
+    }
+
     public boolean isReady() {
         return targetRPM > 0 &&
-               currentRPM >= targetRPM * 0.95;
+                currentRPM >= targetRPM * 0.95;
     }
+
+    // Control
 
     public void stop() {
 
@@ -294,36 +283,20 @@ public class CustomShooterV2 {
         motor.setPower(0);
     }
 
-    public void setPIDF(double p, double i, double d, double f, double recoveryGain, double maxBoost) {
+    public void setPIDF(
+            double p,
+            double i,
+            double d,
+            double f,
+            double recoveryGain,
+            double maxBoost) {
+
         kP = p;
         kI = i;
         kD = d;
         kF = f;
+
         this.maxBoost = maxBoost;
         this.recoveryGain = recoveryGain;
-    }
-
-    public void setAutoKFEnabled(boolean enabled) {
-        this.autoKFEnabled = enabled;
-    }
-
-    public boolean isAutoKFEnabled() {
-        return autoKFEnabled;
-    }
-
-    public double getKF() {
-        return kF;
-    }
-
-    public void setKFAdaptRate(double rate) {
-        this.kFAdaptRate = rate;
-    }
-
-    public void setUnderSpeedRatio(double ratio) {
-        this.underSpeedRatio = ratio;
-    }
-
-    public void setOverSpeedRatio(double ratio) {
-        this.overSpeedRatio = ratio;
     }
 }

@@ -80,8 +80,8 @@ public class Ateleop1_Blue extends LinearOpMode {
     public static double SHOOTER_F = 0.00019;
     public static double SHOOTER_RECOVERY = 0.08;
     public static double SHOOTER_MAX_BOOST = 0.25;
-    public static double SHOOTER_A = 34;
-    public static double SHOOTER_B = 2555;
+    public static double SHOOTER_A = 155/5;
+    public static double SHOOTER_B = 2515;
 
     /* public static double SHOOTER_P = 120;
     public static double SHOOTER_I = 0;
@@ -126,7 +126,7 @@ public class Ateleop1_Blue extends LinearOpMode {
     double kd = 0;
     double ki = 0;
 
-    double turret_kp = 0.01, turret_ki = 0, turret_kd = 0.001, turret_kf = 0;
+    double turret_kp = 0.01, turret_ki = 0, turret_kd = 0, turret_kf = 0;
     double turret_lasterror = 0, turret_integral = 0;
 
     double erro;
@@ -138,7 +138,7 @@ public class Ateleop1_Blue extends LinearOpMode {
     boolean passo = false;
 
     double rx = 0;
-    double multiplicador = 0.8;
+    double multiplicador = 0.95;
     double curvapower = 0.65;
 
     String state = "parado";
@@ -175,25 +175,41 @@ public class Ateleop1_Blue extends LinearOpMode {
                     torreta.setPower(powerTorretaManual);
                     torreta1.setPower(powerTorretaManual);
                     shooterVelocity = SHOOTER_B;
-                } else if (limelight.isValid) {
+                } else if (limelight.isValid && !passando && !atirando) {
                     // TAG ENCONTRADA: Rastreia com PID pelo caminho mais curto
                     double error = limelight.getTx();
-                    if(Math.abs(error) >= 3){
+                    if(Math.abs(error) >= 2) {
                         double proporcional = turret_kp * error;
-                        turret_integral += error*turret_ki;
+                        turret_integral += error * turret_ki;
                         double derivada = (error - turret_lasterror) * turret_kd;
                         turret_lasterror = error;
                         double feedforward = turret_kf * Math.signum(error);
                         double output = proporcional + turret_integral + derivada;
                         torreta.setPower(output);
                         torreta1.setPower(output);
-                        shooterVelocity = SHOOTER_A*(limelight.getTy()-27) + SHOOTER_B;
                     }
                 } else {
                     torreta.setPower(0.0);
                     torreta1.setPower(0.0);
                     shooterVelocity = SHOOTER_B;
                 }
+                if(limelight.isValid && !passando && !atirando){
+                    if(limelight.getTy() < 26.2){
+                        shooterVelocity = 2450;
+                    }
+                    else if(limelight.getTy() >= 26.2 && limelight.getTy() < 27.5){
+                        shooterVelocity = 2515;
+                    } else if (limelight.getTy() >= 28 && limelight.getTy() < 29.5) {
+                        shooterVelocity = 2600;
+                    } else if (limelight.getTy() >= 29.5 && limelight.getTy() < 32) {
+                        shooterVelocity = 2650;
+                    }else{
+                        shooterVelocity = 2720;
+                    }
+                } else if (!atirando && !passando){
+                    shooterVelocity = 2515;
+                }
+
             }
         }
     });
@@ -384,6 +400,7 @@ public class Ateleop1_Blue extends LinearOpMode {
 
         atirador = new CustomShooterV2(shooter);
         Passador transf = new Passador(passador);
+        mira.start();
 
 
         while (opModeIsActive()) {
@@ -406,32 +423,7 @@ public class Ateleop1_Blue extends LinearOpMode {
                 servoflor1.setPosition(1);
             }
 
-            double powerTorretaManual = gamepad2.left_stick_x;
 
-            if (Math.abs(powerTorretaManual) > 0.1) {
-                // Override manual no Gamepad 2
-                torreta.setPower(powerTorretaManual);
-                torreta1.setPower(powerTorretaManual);
-                shooterVelocity = SHOOTER_B;
-            } else if (limelight.isValid) {
-                // TAG ENCONTRADA: Rastreia com PID pelo caminho mais curto
-                double error = limelight.getTx()+llajuste;
-                if(Math.abs(error) >= 2){
-                    double proporcional = turret_kp * error;
-                    turret_integral += error*turret_ki;
-                    double derivada = (error - turret_lasterror) * turret_kd;
-                    turret_lasterror = error;
-                    double feedforward = turret_kf * Math.signum(error);
-                    double output = proporcional + turret_integral + derivada;
-                    torreta.setPower(output);
-                    torreta1.setPower(output);
-                    shooterVelocity = SHOOTER_A*(limelight.getTy()-22) + SHOOTER_B;
-                }
-            } else {
-                torreta.setPower(0.0);
-                torreta1.setPower(0.0);
-                shooterVelocity = SHOOTER_B;
-            }
 
             double x = gamepad1.left_stick_x;
             double y = -gamepad1.left_stick_y;
@@ -480,7 +472,7 @@ public class Ateleop1_Blue extends LinearOpMode {
                 }
             }
             if (passando && transf.isReady()) {
-                servorampa.setPosition(0.54);
+                servorampa.setPosition(0.57);
                 sleep(500);
                 transfer.setVelocity(convertRPMtoTicks(700));
                 intake.setPower(0.6);
@@ -492,7 +484,7 @@ public class Ateleop1_Blue extends LinearOpMode {
                     transfer.setVelocity(convertRPMtoTicks(1200));
                 }
                 if(timer.time() > 2.5){
-                    transfer.setVelocity(convertRPMtoTicks(1900));
+                    transfer.setVelocity(convertRPMtoTicks(2200));
                 }
                 if(timer.time() > 3.5){
                     atirando = false;

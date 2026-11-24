@@ -28,9 +28,10 @@ public class MeepMeepTesting {
                 .setConstraints(60, 60, Math.toRadians(180), Math.toRadians(180), 15)
                 .build();
 
-        myBot.runAction(myBot.getDrive().actionBuilder(new Pose2d(-61, 12, Math.toRadians(90)))
-                .lineToY( 62)
-                .lineToY(59)
+        myBot.runAction(myBot.getDrive().actionBuilder(new Pose2d(-61, 12, Math.toRadians(0)))
+                .splineToSplineHeading(new Pose2d(new Vector2d(-24, 44), Math.toRadians(90)), Math.toRadians(360))
+                        .waitSeconds(1)
+
                 .splineToLinearHeading(new Pose2d(new Vector2d(38, 38), Math.toRadians(180)), Math.toRadians(-45))
                 .strafeTo(new Vector2d(56, 38))
                 .strafeToSplineHeading(new Vector2d(-24, 52), Math.toRadians(90))
