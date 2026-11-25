@@ -80,8 +80,7 @@ public class Ateleop1_Blue extends LinearOpMode {
     public static double SHOOTER_F = 0.00019;
     public static double SHOOTER_RECOVERY = 0.08;
     public static double SHOOTER_MAX_BOOST = 0.25;
-    public static double SHOOTER_A = 155/5;
-    public static double SHOOTER_B = 2515;
+    public static double SHOOTER_B = 2480;
 
     /* public static double SHOOTER_P = 120;
     public static double SHOOTER_I = 0;
@@ -114,19 +113,15 @@ public class Ateleop1_Blue extends LinearOpMode {
     public static double POS_ABERTO = 1.0;
     public static double POS_FECHADO = 0.0;
 
-    // --- CONTROLES DE BOTÃO E ESTADOS DA VARREDURA DA TORRETA ---
-    private boolean abriuServoRampa = false;
-    private boolean servoEstaAberto = false;
-    private boolean anteriorX = false;
 
-    private double searchDirection = -1.0;  // Sentido atual da busca da torreta entre os limites
+
 
     // --- GANHOS DO PID DE HEADING DA BASE ---
     double kp = 3;
     double kd = 0;
     double ki = 0;
 
-    double turret_kp = 0.01, turret_ki = 0, turret_kd = 0, turret_kf = 0;
+    public static double turret_kp = 0.01, turret_ki = 0, turret_kd = 0, turret_kf = 0;
     double turret_lasterror = 0, turret_integral = 0;
 
     double erro;
@@ -134,22 +129,13 @@ public class Ateleop1_Blue extends LinearOpMode {
     double integral = 0;
     double ultimoErro = 0;
     double alvo = 0;
-
-    boolean passo = false;
-
     double rx = 0;
     double multiplicador = 0.95;
     double curvapower = 0.65;
 
     String state = "parado";
     int index;
-    public static double incremento = 0;
-    double shot = 1;
-    double countshot = 1;
-    public static double shooterVelocity = 2765;
-    double shooterTicksPerRev = 28.0;
-    public static int velinicial = 2800;
-    public static double currentShooterRPM = 0;
+    public static double shooterVelocity = 0;
     boolean atirando = false;
     boolean passando = false;
 
@@ -168,14 +154,15 @@ public class Ateleop1_Blue extends LinearOpMode {
     Thread mira = new Thread(new Runnable() {
         @Override
         public void run() {
+            double torretaMaxPower = 0;
             while (opModeIsActive()){
-                double powerTorretaManual = gamepad2.left_stick_x;
+                double powerTorretaManual = -gamepad2.left_stick_x;
                 if (Math.abs(powerTorretaManual) > 0.1) {
                     // Override manual no Gamepad 2
                     torreta.setPower(powerTorretaManual);
                     torreta1.setPower(powerTorretaManual);
                     shooterVelocity = SHOOTER_B;
-                } else if (limelight.isValid && !passando && !atirando) {
+                } else if (limelight.isValid) {
                     // TAG ENCONTRADA: Rastreia com PID pelo caminho mais curto
                     double error = limelight.getTx();
                     if(Math.abs(error) >= 2) {
@@ -185,8 +172,25 @@ public class Ateleop1_Blue extends LinearOpMode {
                         turret_lasterror = error;
                         double feedforward = turret_kf * Math.signum(error);
                         double output = proporcional + turret_integral + derivada;
+                        if((atirando && Math.abs(output) > 0.02 )|| (passando && Math.abs(output) > 0.02)){
+                            if(output > 0){
+                                output = 0.02;
+                            }else{
+                                output = -0.02;
+                            }
+                        }
+                        if(Math.abs(output) < 0.02){
+                            if(output > 0){
+                                output = 0.02;
+                            }else{
+                                output = -0.02;
+                            }
+                        }
                         torreta.setPower(output);
                         torreta1.setPower(output);
+                    }else{
+                        torreta.setPower(0.0);
+                        torreta1.setPower(0.0);
                     }
                 } else {
                     torreta.setPower(0.0);
@@ -195,19 +199,21 @@ public class Ateleop1_Blue extends LinearOpMode {
                 }
                 if(limelight.isValid && !passando && !atirando){
                     if(limelight.getTy() < 26.2){
-                        shooterVelocity = 2450;
+                        shooterVelocity = 2500;
                     }
                     else if(limelight.getTy() >= 26.2 && limelight.getTy() < 27.5){
-                        shooterVelocity = 2515;
+                        shooterVelocity = 2450;
                     } else if (limelight.getTy() >= 28 && limelight.getTy() < 29.5) {
-                        shooterVelocity = 2600;
+                        shooterVelocity = 2515;
                     } else if (limelight.getTy() >= 29.5 && limelight.getTy() < 32) {
-                        shooterVelocity = 2650;
+                        shooterVelocity = 2570;
+                    }else if(limelight.getTy() >= 32 && limelight.getTy() <= 35){
+                        shooterVelocity = 2780;
                     }else{
-                        shooterVelocity = 2720;
+                        shooterVelocity = 2450;
                     }
-                } else if (!atirando && !passando){
-                    shooterVelocity = 2515;
+                } else{
+                    shooterVelocity = 2450;
                 }
 
             }

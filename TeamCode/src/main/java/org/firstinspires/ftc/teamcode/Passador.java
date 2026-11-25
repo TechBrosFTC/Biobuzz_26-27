@@ -20,7 +20,7 @@ public class Passador {
     private double maxBoost = 0.15;
 
     // Detecção de Passagem do Elemento
-    private double passThreshold = 500;
+    private double passThreshold = 300;
     private double baselineRPM = 0.0;
     private double minPassRPM = 0.0;
 

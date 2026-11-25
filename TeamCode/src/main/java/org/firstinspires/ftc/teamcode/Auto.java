@@ -38,6 +38,8 @@ import java.util.Timer;
 @Autonomous (name = "Auto")
 public class Auto extends LinearOpMode {
 
+    public static boolean enableLimelightAim = false;
+
     @Override
     public void waitForStart() {
         super.waitForStart();
@@ -47,6 +49,7 @@ public class Auto extends LinearOpMode {
         @Override
         public void run() {
             Turret_target turret = new Turret_target(hardwareMap, 0);
+            Limelight limelight = new Limelight(hardwareMap, 0);
             
             // Aguarda os primeiros 7.5 segundos do autônomo sem travar a CPU
             ElapsedTime elapsedTime = new ElapsedTime();
@@ -55,17 +58,28 @@ public class Auto extends LinearOpMode {
                 idle();
             }
 
-            // Executa a transição para -33° com a rampa afim
-            turret.goToTargetAngle(-33, 0.7, 0.35);
+            // Executa a transição para -41° com a rampa afim (goToTarget)
+            turret.goToTargetAngle(-41, 0.7, 0.35);
 
-            // Mantém ativamente a torreta travada no ângulo alvo de -33° via PID pelo resto do autônomo
-            while (opModeIsActive() && elapsedTime.time() < 20){
-                turret.updatePID(-33);
+            // Mantém -41° via PID até a posição shoot2 ser atingida
+            while (opModeIsActive() && elapsedTime.time() < 22){
+                turret.updatePID(-41);
+                sleep(10);
             }
             turret.goToTargetAngle(90, 0.7, 0.35);
-            while (opModeIsActive()){
-                turret.updatePID(90);
+            while (opModeIsActive() && elapsedTime.time() <= 27.5){
+                turret.updatePID(83);
+                sleep(10);
             }
+            turret.goToTargetAngle(0, 0.7, 0.35);
+            while (opModeIsActive()){
+                turret.updatePID(0);
+                sleep(10);
+            }
+
+            // APÓS O MÉTODO GO TO TARGET E APÓS CHEGAR NA POSIÇÃO SHOOT2:
+            // Rastreia e mira com Limelight (idêntico ao TeleOp)
+
         }
     });
 
@@ -106,9 +120,9 @@ public class Auto extends LinearOpMode {
 
         TrajectoryActionBuilder flor = drive.actionBuilder(initialPose)
                 //.strafeTo(new Vector2d(0, 48), maxVel)
-                .splineToSplineHeading(new Pose2d(new Vector2d(-18, 44), Math.toRadians(90)), Math.toRadians(0), maxVel)
-                .strafeTo(new Vector2d(-18, 63.5), maxVel, baseAccelConstraint)
-                .strafeTo(new Vector2d(-18, 65))
+                .splineToSplineHeading(new Pose2d(new Vector2d(-18, 44), Math.toRadians(90)), Math.toRadians(0), maxVel, baseAccelConstraint)
+                .strafeTo(new Vector2d(-18, 61), maxVel)
+                .strafeTo(new Vector2d(-18, 63), maxVel)
                 .waitSeconds(0.4)
                 .strafeTo(new Vector2d(-18, 53), maxVel, baseAccelConstraint)
                 .waitSeconds(0.8);
@@ -116,21 +130,21 @@ public class Auto extends LinearOpMode {
 
 
         TrajectoryActionBuilder second_shot = drive.actionBuilder(new Pose2d(-18, 53, Math.toRadians(90)))
-                .strafeToSplineHeading(new Vector2d(0, 48), Math.toRadians(180), maxVel, baseAccelConstraint)
+                .strafeToSplineHeading(new Vector2d(0, 50), Math.toRadians(180), maxVel, baseAccelConstraint)
                 .strafeTo(new Vector2d(56, 48), maxVel, baseAccelConstraint);
 
         TrajectoryActionBuilder second_flor = drive.actionBuilder(new Pose2d(56, 38, Math.toRadians(180)))
-                .strafeToSplineHeading(new Vector2d(38, 18), Math.toRadians(0), maxVel, baseAccelConstraint)
-                .strafeTo(new Vector2d(60, 18), maxVel, baseAccelConstraint)
-                .strafeTo(new Vector2d(62, 18), maxVel, baseAccelConstraint)
-                .strafeTo(new Vector2d(56, 18))
+                .strafeToSplineHeading(new Vector2d(28, 20), Math.toRadians(0), maxVel, baseAccelConstraint)
+                .strafeTo(new Vector2d(56, 20), maxVel, baseAccelConstraint)
+                .strafeTo(new Vector2d(58, 20), maxVel, baseAccelConstraint)
+                .strafeTo(new Vector2d(49, 20))
                 .waitSeconds(1);
 
-        TrajectoryActionBuilder third_shot = drive.actionBuilder(new Pose2d(56, 18, Math.toRadians(0)))
+        TrajectoryActionBuilder third_shot = drive.actionBuilder(new Pose2d(49, 20, Math.toRadians(0)))
                 .turnTo(Math.toRadians(270));
 
-        TrajectoryActionBuilder parking = drive.actionBuilder(new Pose2d(new Vector2d(56,18), Math.toRadians(270)))
-                .strafeTo(new Vector2d(54, 66), maxVel, baseAccelConstraint);
+        TrajectoryActionBuilder parking = drive.actionBuilder(new Pose2d(new Vector2d(50,18), Math.toRadians(270)))
+                .strafeTo(new Vector2d(40, 66), maxVel, baseAccelConstraint);
 
 
 
@@ -154,20 +168,28 @@ public class Auto extends LinearOpMode {
 
         Actions.runBlocking(
                 new SequentialAction(
-                        shooter.prepareshot(2515),
+                        shooter.prepareshot(2525),
                         shooter.shoot(),
                         intake.intake_on(),
                         intake.rampaBaixo(),
                         flower,
-                        shooter.prepareshot(2550),
-                        intake.intake_off(),
+                        shooter.prepareshot(2495),
                         shoot2,
-                        shooter.shoot1(),
+                        intake.intake_off(),
+                        new Action() {
+                            @Override
+                            public boolean run(@NonNull TelemetryPacket packet) {
+                                enableLimelightAim = true; // Ativa a miras por Limelight após a posição shoot2
+                                return false;
+                            }
+                        },
+                        shooter.shoot(),
                         intake.intake_on(),
+                        shooter.prepareshot(2425),
                         flower2,
                         intake.intake_off(),
                         shoot3,
-                        shooter.shoot1(),
+                        shooter.shoot(),
                         park
 
 
@@ -258,7 +280,7 @@ public class Auto extends LinearOpMode {
         private Servo servo_rampa;
 
         // Transfer PIDF
-        public double SHOOTER_P = 0.007;
+        public double SHOOTER_P = 0.0009;
         public double SHOOTER_I = 0.00001;
         public double SHOOTER_D = 0.0001;
         public double SHOOTER_F = 0.00019;
@@ -338,28 +360,28 @@ public class Auto extends LinearOpMode {
                         passador.update();
                         shooter.update();
                     }
-                    servo_rampa.setPosition(0.54);
+                    servo_rampa.setPosition(0.57);
                     ElapsedTime timer = new ElapsedTime();
                     while (timer.time() < 0.8){
                         passador.update();
                         shooter.update();
                     }
                     timer.reset();
-                    while (opModeIsActive() && timer.time() < 0.5){
+                    while (opModeIsActive() && timer.time() <= 0.5){
                         passador.update();
                         shooter.update();
                         intake.setPower(1);
-                        motor_transfer.setVelocity(convertRPMtoTicks(500));
+                        motor_transfer.setVelocity(convertRPMtoTicks(900));
                     }
-                    while (opModeIsActive() && timer.time() < 2.5 && timer.time() > 0.5 ){
+                    while (opModeIsActive() && timer.time() <= 2.5 && timer.time() > 0.5 ){
                         passador.update();
                         shooter.update();
-                        motor_transfer.setVelocity(convertRPMtoTicks(1170));
+                        motor_transfer.setVelocity(convertRPMtoTicks(1600));
                     }
-                    while (opModeIsActive() && timer.time() < 3.5 && timer.time() > 1.5){
+                    while (opModeIsActive() && timer.time() <= 3 && timer.time() > 2.5){
                         passador.update();
                         shooter.update();
-                        motor_transfer.setVelocity(convertRPMtoTicks(1900));
+                        motor_transfer.setVelocity(convertRPMtoTicks(2400));
                     }
                     motor_transfer.setVelocity(0);
                     servo_rampa.setPosition(1);
@@ -380,7 +402,7 @@ public class Auto extends LinearOpMode {
                         passador.update();
                         shooter.update();
                     }
-                    servo_rampa.setPosition(0.54);
+                    servo_rampa.setPosition(0.57);
                     ElapsedTime timer = new ElapsedTime();
                     while (timer.time() < 0.8){
                         passador.update();
@@ -391,12 +413,12 @@ public class Auto extends LinearOpMode {
                         passador.update();
                         shooter.update();
                         intake.setPower(1);
-                        motor_transfer.setVelocity(convertRPMtoTicks(500));
+                        motor_transfer.setVelocity(convertRPMtoTicks(900));
                     }
                     while (opModeIsActive() && timer.time() < 3 && timer.time() > 0.5 ){
                         passador.update();
                         shooter.update();
-                        motor_transfer.setVelocity(convertRPMtoTicks(1150));
+                        motor_transfer.setVelocity(convertRPMtoTicks(1400));
                     }
                     motor_transfer.setVelocity(0);
                     servo_rampa.setPosition(1);
@@ -547,6 +569,42 @@ public class Auto extends LinearOpMode {
 
             torreta.setPower(0);
             torreta1.setPower(0);
+        }
+
+        /**
+         * Realiza a calibração de Feedforward Estático (kF / Stiction) da torreta.
+         * Instancia os servos e encoder idênticos ao TeleOp e incrementa a potência
+         * gradualmente até detectar o menor movimento no encoder.
+         *
+         * @return O valor de kF estático mínimo encontrado
+         */
+        public double calibrateStaticFeedforward() {
+            if (encoder == null) return 0.02;
+
+            int startTicks = encoder.getCurrentPosition();
+            double testPower = 0.0;
+            double step = 0.002;
+
+            while (opModeIsActive() && testPower <= 0.40) {
+                testPower += step;
+                torreta.setPower(testPower);
+                torreta1.setPower(testPower);
+
+                sleep(40);
+
+                int deltaTicks = Math.abs(encoder.getCurrentPosition() - startTicks);
+                // Quando o encoder registra variação (>= 10 ticks), determinou a potência mínima de movimento
+                if (deltaTicks >= 10) {
+                    torreta.setPower(0);
+                    torreta1.setPower(0);
+                    this.kf = testPower; // Define kf com o valor de atrito medido
+                    return testPower;
+                }
+            }
+
+            torreta.setPower(0);
+            torreta1.setPower(0);
+            return testPower;
         }
 
         /**
