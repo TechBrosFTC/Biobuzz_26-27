@@ -21,7 +21,7 @@ public class CustomShooterV2 {
     private double maxBoost = 0.15;
 
     // Shot Detection
-    private double shotThreshold = 15;
+    private double shotThreshold = 150;
     private double baselineRPM = 0;
     private double minShotRPM = 0;
 
@@ -254,7 +254,6 @@ public class CustomShooterV2 {
     public boolean isShotDetected() {
         return shotDetected;
     }
-
 
     public boolean isRecovering() {
         return recovering;

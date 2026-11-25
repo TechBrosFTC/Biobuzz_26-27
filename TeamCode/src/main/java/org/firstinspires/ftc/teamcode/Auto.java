@@ -59,11 +59,11 @@ public class Auto extends LinearOpMode {
             }
 
             // Executa a transição para -41° com a rampa afim (goToTarget)
-            turret.goToTargetAngle(-41, 0.7, 0.35);
+            turret.goToTargetAngle(-39.5, 0.7, 0.35);
 
             // Mantém -41° via PID até a posição shoot2 ser atingida
             while (opModeIsActive() && elapsedTime.time() < 22){
-                turret.updatePID(-41);
+                turret.updatePID(-39.5);
                 sleep(10);
             }
             turret.goToTargetAngle(90, 0.7, 0.35);
@@ -185,7 +185,7 @@ public class Auto extends LinearOpMode {
                         },
                         shooter.shoot(),
                         intake.intake_on(),
-                        shooter.prepareshot(2425),
+                        shooter.prepareshot(2400),
                         flower2,
                         intake.intake_off(),
                         shoot3,
@@ -381,7 +381,7 @@ public class Auto extends LinearOpMode {
                     while (opModeIsActive() && timer.time() <= 3 && timer.time() > 2.5){
                         passador.update();
                         shooter.update();
-                        motor_transfer.setVelocity(convertRPMtoTicks(2400));
+                        motor_transfer.setVelocity(convertRPMtoTicks(3200));
                     }
                     motor_transfer.setVelocity(0);
                     servo_rampa.setPosition(1);
