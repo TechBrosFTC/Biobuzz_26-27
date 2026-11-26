@@ -120,16 +120,16 @@ public class Auto extends LinearOpMode {
 
         TrajectoryActionBuilder flor = drive.actionBuilder(initialPose)
                 //.strafeTo(new Vector2d(0, 48), maxVel)
-                .splineToSplineHeading(new Pose2d(new Vector2d(-18, 44), Math.toRadians(90)), Math.toRadians(0), maxVel, baseAccelConstraint)
-                .strafeTo(new Vector2d(-18, 61), maxVel)
-                .strafeTo(new Vector2d(-18, 63), maxVel)
+                .splineToSplineHeading(new Pose2d(new Vector2d(-19, 44), Math.toRadians(90)), Math.toRadians(0), maxVel, baseAccelConstraint)
+                .strafeTo(new Vector2d(-19, 61), maxVel)
+                .strafeTo(new Vector2d(-19, 63), maxVel)
                 .waitSeconds(0.4)
-                .strafeTo(new Vector2d(-18, 53), maxVel, baseAccelConstraint)
+                .strafeTo(new Vector2d(-19, 53), maxVel, baseAccelConstraint)
                 .waitSeconds(0.8);
 
 
 
-        TrajectoryActionBuilder second_shot = drive.actionBuilder(new Pose2d(-18, 53, Math.toRadians(90)))
+        TrajectoryActionBuilder second_shot = drive.actionBuilder(new Pose2d(-19, 53, Math.toRadians(90)))
                 .strafeToSplineHeading(new Vector2d(0, 50), Math.toRadians(180), maxVel, baseAccelConstraint)
                 .strafeTo(new Vector2d(56, 48), maxVel, baseAccelConstraint);
 
@@ -173,7 +173,7 @@ public class Auto extends LinearOpMode {
                         intake.intake_on(),
                         intake.rampaBaixo(),
                         flower,
-                        shooter.prepareshot(2495),
+                        shooter.prepareshot(2503),
                         shoot2,
                         intake.intake_off(),
                         new Action() {
@@ -376,7 +376,7 @@ public class Auto extends LinearOpMode {
                     while (opModeIsActive() && timer.time() <= 2.5 && timer.time() > 0.5 ){
                         passador.update();
                         shooter.update();
-                        motor_transfer.setVelocity(convertRPMtoTicks(1600));
+                        motor_transfer.setVelocity(convertRPMtoTicks(1700));
                     }
                     while (opModeIsActive() && timer.time() <= 3 && timer.time() > 2.5){
                         passador.update();
